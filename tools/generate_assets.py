@@ -73,53 +73,6 @@ def main():
     js(ASSETS / 'blockstates/stone_mill.json',{'variants':{'':{'model':'bigfatfish:block/stone_mill'}}})
     js(ASSETS / 'models/item/stone_mill.json',{'parent':'bigfatfish:block/stone_mill'})
 
-    pix,r=canvas(256,128)
-    palette=[(0,0,(250,218,207)),(64,0,(52,87,160)),(128,0,(241,237,248)),(192,0,(32,39,79)),(0,64,(251,224,213)),(64,64,(203,168,90)),(128,64,(97,178,214)),(192,64,(241,237,248))]
-    for x,y,c in palette:
-        r(x,y,x+64,y+64,c)
-        for yy in range(y,y+64):
-            for xx in range(x,x+64):
-                delta=((xx*7+yy*11)%9)-4
-                color=c
-                if x==64 and y==0:
-                    delta+=(xx%7)*2
-                    blend=max(0,min(1,(yy-10)/14))
-                    color=tuple(int(a+(b-a)*blend) for a,b in zip(c,(70,162,201)))
-                r(xx,yy,xx+1,yy+1,tuple(max(0,min(255,v+delta)) for v in color))
-    # Head front UV: x=10..19, y=74..83. Blue eyes and a small smiling mouth.
-    r(10,74,20,77,(60,90,164)); r(10,77,11,80,(67,98,175)); r(19,77,20,80,(67,98,175))
-    for x in [12,16]:
-        r(x,78,x+2,81,(32,60,110)); r(x,79,x+2,80,(76,155,218)); r(x,78,x+1,79,(255,255,255))
-    r(11,81,13,82,(243,163,167)); r(17,81,19,82,(243,163,167)); r(14,82,16,83,(180,98,106))
-    r(0,96,32,128,(241,237,248))
-    for yy in [98,100,102]: r(3,yy,4,yy+1,(47,64,120))
-    r(195,68,199,70,(66,95,163)); r(198,67,200,68,(66,95,163)); r(199,66,200,68,(66,95,163))
-    r(195,68,196,69,(255,255,255)); r(196,66,197,67,(66,95,163))
-    for outfit in ['maid', 'summer']:
-        detailed, draw = canvas(512,256)
-        for y in range(256):
-            for x in range(512): detailed[y*512+x] = pix[(y//2)*256+x//2]
-        draw(18,146,36,163,(251,224,213))
-        for eye in [21,29]:
-            draw(eye-1,151,eye+5,152,(34,39,72))
-            draw(eye,152,eye+4,157,(255,250,247))
-            draw(eye+1,152,eye+4,157,(50,105,179))
-            draw(eye+2,152,eye+3,156,(23,47,91))
-            draw(eye+1,152,eye+2,153,(255,255,255))
-            draw(eye+2,156,eye+4,157,(96,189,230))
-        draw(20,158,23,159,(247,172,177)); draw(31,158,34,159,(247,172,177))
-        draw(26,160,29,161,(177,93,112)); draw(27,161,29,162,(235,146,160))
-        for y in range(128):
-            for x in range(128,256):
-                t=min(1,y/76); shine=max(0,1-abs((x%17)-8)/8)*17
-                c=tuple(int(a+(b-a)*t+shine) for a,b in zip((40,62,128),(61,152,194)))
-                draw(x,y,x+1,y+1,c)
-        if outfit=='summer':
-            draw(384,0,512,128,(237,243,255))
-            draw(256,0,384,128,(249,248,255))
-            draw(0,192,64,256,(244,247,255))
-        png(ASSETS / f'textures/entity/{outfit}.png',512,256,detailed)
-
     js(DATA / 'recipe/cooked_rice.json',{'type':'minecraft:crafting_shapeless','ingredients':['bigfatfish:rice']*3+['minecraft:bowl'],'result':{'id':'bigfatfish:cooked_rice','count':1}})
     js(DATA / 'recipe/stone_mill.json',{'type':'minecraft:crafting_shaped','pattern':['SWS','CCC','CCC'],'key':{'S':'minecraft:stone_slab','W':'minecraft:stick','C':'minecraft:cobblestone'},'result':{'id':'bigfatfish:stone_mill','count':1}})
     # 26.3 uses singular condition/modifier keys and typed predicates.
@@ -157,13 +110,22 @@ def main():
         'bed':['这张床看起来不错，借我坐一会儿。','只是坐一下，才不是想偷睡！','床上舒服多了……你不许笑。'],
         'death':['主人……背包里的东西，记得拿走。','还没吃到下一碗米饭呢……','哼……这回可要你来保护我了。'],
     }
+    dialogue.update({
+        'taming':['哼，饭先收下啦，跟不跟你还要再想想！','我、我才没有被一碗米饭收买呢……还有吗？','再陪我一会儿嘛，人家还不认识你呢。','嗯，好香！下次也要这个味道哦。','别急着摸头啦，我还没答应呢！','你带的饭不错……可以再来一碗吗？'],
+        'baby_tame':['那、那就牵着我走吧！米饭也要带上哦。','以后你就是我的饭饭主人啦，嘿嘿！','我会乖乖跟着你的，才不是因为喜欢你呢！'],
+        'baby_fed':['啊呜！吃饱饱，长高高！','饭饭好香呀，再摸摸我的头嘛。','嘿嘿……尾巴摇起来了，不许笑我！'],
+        'baby_hungry':['主人，饭饭呢？小肚肚在咕咕叫啦！','我还小嘛……想要一碗香香的米饭。','给我饭饭，我就给你看尾巴摇摇！'],
+        'baby_cute':['看我看我！今天也有乖乖等你哦。','我才没有想撒娇……只是想挨着你一点点。','嘿嘿，长大以后就能帮你啦，现在先抱抱嘛。'],
+    })
     for event,lines in dialogue.items():
         for i,line in enumerate(lines): zh[f'dialogue.bigfatfish.{event}.{i}']='〈大肥鱼〉'+line
     zh.update({'skin.bigfatfish.maid':'鲸尾女仆', 'skin.bigfatfish.summer':'白蓝夏日', 'screen.bigfatfish.skin':'外观 · 点击切换'})
+    zh.update({'screen.bigfatfish.juvenile':'幼年 · 米饭帮助长大','screen.bigfatfish.adult':'成年 · 可以帮忙干活'})
     js(ASSETS / 'lang/zh_cn.json',zh)
     en=dict(zh)
     en.update({'entity.bigfatfish.big_fat_fish':'Big Fat Fish','block.bigfatfish.rice_crop':'Rice Plant','block.bigfatfish.stone_mill':'Stone Mill','item.bigfatfish.paddy':'Paddy','item.bigfatfish.rice':'Rice Grain','item.bigfatfish.cooked_rice':'Bowl of Rice','item.bigfatfish.stone_mill':'Stone Mill','item.bigfatfish.big_fat_fish_spawn_egg':'Big Fat Fish Spawn Egg','screen.bigfatfish.backpack':'Backpack (27 slots)','screen.bigfatfish.mainhand':'Right (main)','screen.bigfatfish.offhand':'Left','screen.bigfatfish.hunger':'Food: %s/20'})
     en.update({'skin.bigfatfish.maid':'Whale Maid', 'skin.bigfatfish.summer':'Summer Blue', 'screen.bigfatfish.skin':'Skin: select below'})
+    en.update({'screen.bigfatfish.juvenile':'Young: feed rice','screen.bigfatfish.adult':'Adult: can help'})
     js(ASSETS / 'lang/en_us.json',en)
 
 if __name__ == '__main__': main()

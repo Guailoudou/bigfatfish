@@ -26,6 +26,8 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
     private static final EntityDataAccessor<Integer> HUNGER = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ACTIVITY = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SKIN = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> EMOTE = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Long> EMOTE_START = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.LONG);
     public static final int IDLE = 0, FOLLOW = 1, REST = 2, HARVEST = 3, FIGHT = 4, LOAF = 5, BEG = 6, BED = 7;
     public final SimpleContainer backpack = new SimpleContainer(27);
     private BlockPos workAnchor;
@@ -39,7 +41,20 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         setGuaranteedDrop(EquipmentSlot.OFFHAND);
     }
     @Override protected void defineSynchedData(SynchedEntityData.Builder b) {
-        super.defineSynchedData(b); b.define(HUNGER, 20); b.define(ACTIVITY, IDLE); b.define(SKIN, 0);
+        super.defineSynchedData(b); b.define(HUNGER, 20); b.define(ACTIVITY, IDLE); b.define(SKIN, 0); b.define(EMOTE, 0); b.define(EMOTE_START, 0L);
+    }
+    public int emote() { return entityData.get(EMOTE); }
+    public long emoteStart() { return entityData.get(EMOTE_START); }
+    public void emote(int value) { entityData.set(EMOTE, value); entityData.set(EMOTE_START, level().getGameTime()); }
+    @Override public float getAgeScale() { return 1; } // The juvenile has its own proportions and one-block mesh.
+    @Override public EntityDimensions getDefaultDimensions(Pose pose) {
+        return isBaby() ? EntityDimensions.scalable(0.45F, 1).withEyeHeight(0.78F) : super.getDefaultDimensions(pose);
+    }
+    @Override public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason reason, SpawnGroupData group) {
+        var result = super.finalizeSpawn(level, difficulty, reason, group);
+        if (reason == EntitySpawnReason.NATURAL || reason == EntitySpawnReason.CHUNK_GENERATION || reason == EntitySpawnReason.SPAWN_ITEM_USE)
+            setBaby(random.nextInt(4) == 0);
+        return result;
     }
     public int skin() { return entityData.get(SKIN); }
     public void setSkin(int value) { entityData.set(SKIN, Math.clamp(value, 0, 1)); }
@@ -76,12 +91,14 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
     }
     @Override public void aiStep() {
         super.aiStep();
+        if (!level().isClientSide() && emote() != 0 && level().getGameTime() - emoteStart() >= 60) emote(0);
         if (!(level() instanceof ServerLevel) || !isTame()) return;
+        if (!isBaby() && emote() == 0 && (activity() == FOLLOW || activity() == REST || activity() == BED) && tickCount % 240 == 0 && random.nextInt(4) == 0) emote(1 + random.nextInt(3));
         if (chatCooldown > 0) chatCooldown--;
         if (activity() == HARVEST || activity() == FIGHT) effortTicks++;
         if (++hungryClock >= 400) {
             hungryClock = 0;
-            double chance = effortTicks > 0 ? 0.55 : 0.12;
+            double chance = isBaby() ? 0.45 : effortTicks > 0 ? 0.55 : 0.12;
             effortTicks = 0;
             if (random.nextDouble() < chance) entityData.set(HUNGER, Math.max(0, hunger() - 1));
         }
@@ -94,7 +111,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         }
         if (held.is(BigFatFishMod.COOKED_RICE)) {
             if (!level().isClientSide()) {
-                boolean consume = !isTame() || hunger() < 20 || getHealth() < getMaxHealth();
+                boolean consume = !isTame() || isBaby() || hunger() < 20 || getHealth() < getMaxHealth();
                 if (consume) {
                     boolean infiniteMaterials = player.hasInfiniteMaterials();
                     held.consume(1, player);
@@ -104,10 +121,19 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
                         else if (!player.getInventory().add(bowl)) player.drop(bowl, false, net.minecraft.util.Prediction.SERVER_ONLY);
                     }
                     entityData.set(HUNGER, Math.min(20, hunger() + 8)); heal(4);
+                    emote(4);
+                    if (isBaby()) ageUp(AgeableMob.getSpeedUpSecondsWhenFeeding(-getAge()), true);
                     if (!isTame()) {
-                        if (random.nextInt(3) == 0) { tame(player); level().broadcastEntityEvent(this, (byte) 7); say("tame", true); }
-                        else level().broadcastEntityEvent(this, (byte) 6);
-                    } else say("fed", true);
+                        // Same independent 1/3 roll as Minecraft 26.3 Cat.tryToTame; failed bowls do not accumulate a guarantee.
+                        if (random.nextInt(3) == 0) {
+                            tame(player); setOrderedToSit(true); workAnchor = blockPosition();
+                            level().broadcastEntityEvent(this, (byte) 7); emote(2); say(isBaby() ? "baby_tame" : "tame", true);
+                        } else {
+                            level().broadcastEntityEvent(this, (byte) 6);
+                            player.sendSystemMessage(Component.translatable("dialogue.bigfatfish.taming." + random.nextInt(6)));
+                            emote(2);
+                        }
+                    } else say(isBaby() ? "baby_fed" : "fed", true);
                 } else say("full", true);
             }
             return InteractionResult.SUCCESS;
@@ -130,7 +156,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
     public void say(String event, boolean force) {
         if (!(getOwner() instanceof ServerPlayer owner) || (!force && chatCooldown > 0)) return;
         owner.sendSystemMessage(Component.translatable("dialogue.bigfatfish." + event + "." + random.nextInt(3)));
-        chatCooldown = event.equals("hungry") ? 600 : 200;
+        chatCooldown = event.endsWith("hungry") ? 600 : 200;
     }
     @Override protected void addAdditionalSaveData(ValueOutput out) {
         super.addAdditionalSaveData(out);
@@ -163,6 +189,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         private BlockPos crop, bed;
         private int scanCooldown, actionCooldown, loafTicks, bedTicks, walkCooldown, attackCooldown;
         private boolean fullAnnounced;
+        private boolean following;
         private List<ItemStack> blockedHarvest;
         CompanionGoal() { setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP)); }
         @Override public boolean canUse() { return isTame(); }
@@ -197,6 +224,22 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
             if (isOrderedToSit() && workAnchor == null) workAnchor = blockPosition();
             if (isOrderedToSit() && !allowed(position())) { crop = null; bed = null; setTarget(null); walkCooldown = 0; rest(); return; }
             LivingEntity owner = getOwner();
+            if (isBaby()) {
+                crop = null; bed = null; loafTicks = 0; setTarget(null);
+                boolean wantsRice = hungry() || tickCount % 600 < 100 || owner != null
+                    && (owner.getMainHandItem().is(BigFatFishMod.COOKED_RICE) || owner.getOffhandItem().is(BigFatFishMod.COOKED_RICE));
+                if (owner != null && owner.isAlive() && wantsRice && allowed(owner.position()) && distanceToSqr(owner) <= 1024) {
+                    activity(BEG); setInSittingPose(false); getLookControl().setLookAt(owner, 30, 30);
+                    if (distanceToSqr(owner) > 9) move(owner.position(), 2.5); else getNavigation().stop();
+                    if (emote() == 0) emote(5);
+                    say("baby_hungry", false);
+                } else if (isOrderedToSit()) rest();
+                else followOwner(owner);
+                if (tickCount % 160 == 0 && random.nextInt(3) == 0 && emote() == 0) {
+                    emote(1 + random.nextInt(3)); say("baby_cute", false);
+                }
+                return;
+            }
             if (hungry()) {
                 crop = null; bed = null; setTarget(null); bedTicks = 0;
                 if (owner != null && owner.isAlive() && allowed(owner.position()) && distanceToSqr(owner) <= 32 * 32) {
@@ -285,13 +328,20 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
                     }
                 }
             }
+            followOwner(owner);
+        }
+        private void followOwner(LivingEntity owner) {
             activity(FOLLOW); setInSittingPose(false);
             if (owner != null && owner.isAlive()) {
                 getLookControl().setLookAt(owner, 30, 30);
-                if (distanceToSqr(owner) > 144 && !isLeashed() && !isPassenger()) tryToTeleportToOwner();
-                else if (distanceToSqr(owner) > 6.25) move(owner.position(), 3);
+                double distance = distanceToSqr(owner);
+                // Vanilla cat hysteresis: start at ten blocks, stop at five, teleport at twelve.
+                if (distance >= 100) following = true;
+                if (distance <= 25) following = false;
+                if (following && distance >= 144 && !isLeashed() && !isPassenger()) tryToTeleportToOwner();
+                else if (following) move(owner.position(), 2.5);
                 else getNavigation().stop();
-            } else { activity(IDLE); getNavigation().stop(); }
+            } else { following = false; activity(IDLE); getNavigation().stop(); }
         }
         private boolean mature(BlockState s) {
             return s.getBlock() instanceof CropBlock c && c.isMaxAge(s)

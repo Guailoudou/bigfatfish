@@ -34,7 +34,7 @@ public final class FishClientTest implements FabricClientGameTest {
                 level.setBlockAndUpdate(new BlockPos(-2, -60, 1), BigFatFishMod.MILL.defaultBlockState());
                 return fish.getId();
             });
-            context.waitTicks(10);
+            context.waitTicks(160); // Let the tame advancement toast finish before visual captures.
             connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
             context.runOnClient(mc -> { mc.player.setYRot(180); mc.player.setXRot(4); });
             connection.waitForChunksRender();
@@ -66,8 +66,72 @@ public final class FishClientTest implements FabricClientGameTest {
             });
             context.takeScreenshot("bigfatfish-summer-backpack");
             context.setScreen(() -> null);
+            world.getServer().runOnServer(server -> {
+                var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);
+                fish.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,ItemStack.EMPTY);
+                connection.getServerPlayer().teleportTo(fish.getX(),fish.getY(),fish.getZ()+2.8);
+            });
             context.waitTicks(5);
-            context.takeScreenshot("bigfatfish-summer-model");
+            context.runOnClient(mc -> {mc.player.setYRot(180);mc.player.setXRot(12);});
+            context.takeScreenshot("adult-summer-front");
+            world.getServer().runOnServer(server -> {
+                var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);fish.setSkin(0);
+            });
+            context.waitTicks(5);context.takeScreenshot("adult-maid-front");
+            for(int angle : new int[]{90,180}) {
+                world.getServer().runOnServer(server -> {
+                    var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);
+                    fish.setYRot(angle);fish.yBodyRot=angle;fish.yHeadRot=angle;
+                });
+                context.waitTicks(5);context.takeScreenshot("adult-maid-"+angle);
+            }
+            world.getServer().runOnServer(server -> {
+                var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);
+                fish.setBaby(true);fish.setYRot(0);fish.yBodyRot=0;fish.yHeadRot=0;
+                connection.getServerPlayer().openMenu(fish);
+            });
+            context.waitForScreen(FishScreen.class);context.waitTicks(5);
+            connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
+            context.runOnClient(mc -> {
+                var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
+                if(!fish.isBaby() || fish.getBbHeight()!=1) throw new AssertionError("Juvenile age and one-block dimensions synchronize");
+            });
+            context.takeScreenshot("juvenile-maid-backpack");
+            context.clickScreenButton("skin.bigfatfish.summer");connection.waitForServerboundPackets();context.waitTicks(5);
+            context.takeScreenshot("juvenile-summer-backpack");
+            world.getServer().runOnServer(server -> ((BigFatFishEntity)connection.getServerLevel().getEntity(entityId)).emote(5));
+            context.waitTicks(20);
+            context.runOnClient(mc -> {
+                if(((FishScreen)mc.gui.screen()).getMenu().fish().emote()!=5) throw new AssertionError("Beg animation synchronizes");
+            });
+            context.takeScreenshot("juvenile-beg");
+            for(int emote : new int[]{1,2,3,4}) {
+                world.getServer().runOnServer(server -> ((BigFatFishEntity)connection.getServerLevel().getEntity(entityId)).emote(emote));
+                context.waitTicks(24);
+                context.runOnClient(mc -> {
+                    var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
+                    var renderer=(FishRenderer)mc.getEntityRenderDispatcher().getRenderer(fish);
+                    var state=renderer.createRenderState(fish,0);
+                    if(state.emote!=emote || state.emoteTime<10 || state.emoteTime>50)
+                        throw new AssertionError("Emote must be at a visible animation phase: id="+state.emote+", elapsed="+state.emoteTime);
+                    renderer.getModel().setupAnim(state);
+                    if((emote==1 || emote==3) && renderer.getModel().rightArm.zRot<0.6F)
+                        throw new AssertionError("Wave and stretch must raise the arm");
+                    if((emote==2 || emote==4) && renderer.getModel().rightArm.xRot>-0.3F)
+                        throw new AssertionError("Shy and eating gestures must move hands forward");
+                });
+                context.takeScreenshot("juvenile-emote-"+emote);
+            }
+            // Same world and renderer must return to adult geometry after crossing the age boundary.
+            world.getServer().runOnServer(server -> {
+                var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);fish.setAge(0);fish.emote(0);
+            });
+            context.waitTicks(5);connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
+            context.runOnClient(mc -> {
+                var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
+                if(fish.isBaby() || Math.abs(fish.getBbHeight()-1.8)>0.001) throw new AssertionError("Maturity synchronizes adult geometry and dimensions");
+            });
+            context.takeScreenshot("adult-after-growth");context.setScreen(() -> null);
         }
     }
 }

@@ -43,6 +43,7 @@ public final class FishScreen extends AbstractContainerScreen<FishMenu> {
     @Override protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         g.text(font, title, 8, 6, 0xFFFFFFFF, false);
         g.text(font, Component.translatable("screen.bigfatfish.skin"), 184, 10, 0xFFB8D5F8, false);
+        if (menu.fish() != null) g.text(font, Component.translatable(menu.fish().isBaby() ? "screen.bigfatfish.juvenile" : "screen.bigfatfish.adult"), 184, 151, 0xFFB8D5F8, false);
         g.text(font, Component.translatable("screen.bigfatfish.backpack"), 8, 18, 0xFFB8D5F8, false);
         g.text(font, Component.translatable("screen.bigfatfish.mainhand"), 8, 89, 0xFFFFFFFF, false);
         g.text(font, Component.translatable("screen.bigfatfish.offhand"), 104, 89, 0xFFFFFFFF, false);

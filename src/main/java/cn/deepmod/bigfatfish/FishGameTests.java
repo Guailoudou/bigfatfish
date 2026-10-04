@@ -12,6 +12,91 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.storage.*;
 
 public final class FishGameTests {
+    @GameTest public void naturalSpawnProvidesBothAges(GameTestHelper h) {
+        int babies=0,adults=0;
+        for(int seed=0;seed<32;seed++) {
+            var fish=BigFatFishMod.BIG_FAT_FISH.create(h.getLevel(),net.minecraft.world.entity.EntitySpawnReason.NATURAL);
+            fish.setPos(net.minecraft.world.phys.Vec3.atCenterOf(h.absolutePos(new BlockPos(3,2,3))));
+            // Spread seed bits: consecutive small LCG seeds share the initial nextInt(4) high bits.
+            fish.getRandom().setSeed(seed * 0x9E3779B97F4A7C15L);
+            fish.finalizeSpawn(h.getLevel(),h.getLevel().getCurrentDifficultyAt(fish.blockPosition()),net.minecraft.world.entity.EntitySpawnReason.NATURAL,null);
+            if(fish.isBaby()) babies++;else adults++;
+            h.assertTrue(fish.skin()==0 || fish.skin()==1,"Natural entity uses a supported outfit");
+        }
+        h.assertTrue(babies>0 && adults>0,"Seeded natural spawns provide both juvenile and adult forms: young="+babies+", adults="+adults);h.succeed();
+    }
+    @GameTest public void juvenileSizeGrowthAndSave(GameTestHelper h) {
+        var owner=h.makeMockServerPlayerInLevel();owner.setGameMode(GameType.SURVIVAL);
+        var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,3,2,3);fish.tame(owner);fish.setBaby(true);fish.setSkin(1);
+        h.assertTrue(fish.getBbHeight()==1 && fish.isBaby(),"Juvenile collision height is exactly one block");
+        int before=fish.getAge();
+        owner.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(BigFatFishMod.COOKED_RICE));
+        fish.mobInteract(owner,InteractionHand.MAIN_HAND);
+        h.assertTrue(fish.getAge()==before+net.minecraft.world.entity.AgeableMob.getSpeedUpSecondsWhenFeeding(-before)*20,"Rice accelerates growth by vanilla feeding amount even when full");
+        h.assertTrue(owner.getMainHandItem().is(Items.BOWL),"Growth feeding consumes rice and returns bowl");
+        var output=TagValueOutput.createWithContext(ProblemReporter.DISCARDING,h.getLevel().registryAccess());fish.saveWithoutId(output);
+        var loaded=BigFatFishMod.BIG_FAT_FISH.create(h.getLevel(),net.minecraft.world.entity.EntitySpawnReason.LOAD);
+        loaded.load(TagValueInput.create(ProblemReporter.DISCARDING,h.getLevel().registryAccess(),output.buildResult()));
+        h.assertTrue(loaded.isBaby() && loaded.getAge()==fish.getAge() && loaded.skin()==1 && loaded.getBbHeight()==1,"Age, dimensions and skin survive reload");
+        fish.setAge(0);
+        h.assertTrue(!fish.isBaby() && Math.abs(fish.getBbHeight()-1.8)<0.001,"Maturity restores adult dimensions");
+        fish.setAge(-5);
+        h.runAfterDelay(10,()->{h.assertTrue(!fish.isBaby() && fish.getBbHeight()>1.7,"Natural aging crosses the adult boundary");h.succeed();});
+    }
+    @GameTest public void tamingIsIndependentCatProbability(GameTestHelper h) {
+        var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);
+        var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,3,2,3);fish.setNoAi(true);
+        // Compare actual interactions with the first roll from the same seeded vanilla RandomSource.
+        for(long seed=0;seed<24;seed++) {
+            fish.setTame(false,false);fish.setOwner(null);fish.getRandom().setSeed(seed);
+            boolean expected=net.minecraft.util.RandomSource.create(seed).nextInt(3)==0;
+            player.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(BigFatFishMod.COOKED_RICE));
+            fish.mobInteract(player,InteractionHand.MAIN_HAND);
+            h.assertTrue(fish.isTame()==expected,"Each bowl matches the cat's independent one-in-three roll, seed="+seed);
+            h.assertTrue(player.getMainHandItem().is(Items.BOWL),"Failed and successful attempts both consume rice");
+        }
+        h.succeed();
+    }
+    @GameTest(maxTicks=160) public void juvenileCannotWorkOrFight(GameTestHelper h) {
+        for(int x=0;x<8;x++) for(int z=0;z<8;z++) h.setBlock(x,1,z,Blocks.DIRT);
+        BlockPos crop=new BlockPos(4,2,3);h.setBlock(crop.below(),Blocks.FARMLAND);
+        h.setBlock(crop,Blocks.WHEAT.defaultBlockState().setValue(net.minecraft.world.level.block.CropBlock.AGE,7));
+        var owner=h.makeMockServerPlayerInLevel();var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,3.5F,2,3.5F);
+        fish.tame(owner);fish.setBaby(true);owner.setPos(fish.position());
+        fish.setItemSlot(EquipmentSlot.MAINHAND,new ItemStack(Items.IRON_HOE));fish.mobInteract(owner,InteractionHand.MAIN_HAND);
+        var zombie=h.spawnWithNoFreeWill(net.minecraft.world.entity.EntityTypes.ZOMBIE,4.5F,2,3.5F);
+        zombie.setItemSlot(EquipmentSlot.HEAD,new ItemStack(Items.IRON_HELMET));
+        h.runAfterDelay(30,()->{
+            h.assertBlockPresent(Blocks.WHEAT,crop);h.assertTrue(fish.backpack.isEmpty(),"Juvenile ignores harvesting tools");
+            fish.setItemSlot(EquipmentSlot.MAINHAND,new ItemStack(Items.IRON_SWORD));
+        });
+        h.runAfterDelay(65,()->{
+            h.assertTrue(zombie.getHealth()==20 && fish.getTarget()==null,"Juvenile ignores sword combat");
+            h.assertTrue(fish.activity()!=BigFatFishEntity.HARVEST && fish.activity()!=BigFatFishEntity.FIGHT,"Juvenile only follows, rests or begs");
+            owner.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(BigFatFishMod.COOKED_RICE));
+        });
+        h.runAfterDelay(135,()->{
+            h.assertTrue(fish.activity()==BigFatFishEntity.BEG && fish.hunger()==20 && fish.emote()==5,"A full juvenile still begs for growth rice held by its owner");h.succeed();
+        });
+    }
+    @GameTest(structure="bigfatfish:work_area",maxTicks=180) public void catFollowDistanceHysteresis(GameTestHelper h) {
+        for(int x=30;x<50;x++) for(int z=32;z<39;z++) h.setBlock(x,1,z,Blocks.DIRT);
+        var owner=h.makeMockServerPlayerInLevel();var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,35.5F,2,35.5F);
+        fish.tame(owner);var initial=fish.position();owner.setPos(initial.add(7,0,0));
+        h.runAfterDelay(25,()->{
+            h.assertTrue(fish.position().distanceToSqr(initial)<0.1,"Does not pursue an owner seven blocks away");
+            owner.setPos(initial.add(11,0,0));
+        });
+        h.runAfterDelay(65,()->{
+            h.assertTrue(fish.getX()>initial.x+0.5,"Starts following beyond ten blocks");
+            owner.setPos(fish.position().add(3,0,0));
+        });
+        h.runAfterDelay(70,()->h.assertTrue(fish.getNavigation().isDone(),"Stops inside five blocks"));
+        h.runAfterDelay(75,()->{
+            var p=fish.position();owner.setPos(p.add(7,0,0));
+            h.runAfterDelay(20,()->{h.assertTrue(fish.position().distanceToSqr(p)<0.1,"Stays stopped until owner again crosses ten blocks");h.succeed();});
+        });
+    }
     @GameTest(maxTicks = 100) public void hungerOverridesWorkAndFeedingResumes(GameTestHelper h) {
         for (int x = 0; x < 8; x++) for (int z = 0; z < 8; z++) h.setBlock(x, 1, z, Blocks.DIRT);
         BlockPos p = new BlockPos(4, 2, 3);
