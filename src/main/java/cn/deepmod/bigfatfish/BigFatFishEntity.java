@@ -25,6 +25,7 @@ import net.minecraft.world.phys.Vec3;
 public final class BigFatFishEntity extends TamableAnimal implements ExtendedMenuProvider<Integer> {
     private static final EntityDataAccessor<Integer> HUNGER = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ACTIVITY = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> SKIN = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
     public static final int IDLE = 0, FOLLOW = 1, REST = 2, HARVEST = 3, FIGHT = 4, LOAF = 5, BEG = 6, BED = 7;
     public final SimpleContainer backpack = new SimpleContainer(27);
     private BlockPos workAnchor;
@@ -33,12 +34,15 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
 
     public BigFatFishEntity(EntityType<? extends BigFatFishEntity> type, Level level) {
         super(type, level);
+        if (!level.isClientSide()) setSkin(random.nextInt(2));
         setGuaranteedDrop(EquipmentSlot.MAINHAND);
         setGuaranteedDrop(EquipmentSlot.OFFHAND);
     }
     @Override protected void defineSynchedData(SynchedEntityData.Builder b) {
-        super.defineSynchedData(b); b.define(HUNGER, 20); b.define(ACTIVITY, IDLE);
+        super.defineSynchedData(b); b.define(HUNGER, 20); b.define(ACTIVITY, IDLE); b.define(SKIN, 0);
     }
+    public int skin() { return entityData.get(SKIN); }
+    public void setSkin(int value) { entityData.set(SKIN, Math.clamp(value, 0, 1)); }
     public int hunger() { return entityData.get(HUNGER); }
     public int activity() { return entityData.get(ACTIVITY); }
     public BlockPos anchor() { return workAnchor; }
@@ -130,12 +134,14 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
     }
     @Override protected void addAdditionalSaveData(ValueOutput out) {
         super.addAdditionalSaveData(out);
+        out.putInt("Skin", skin());
         ContainerHelper.saveAllItems(out.child("Backpack"), backpack.getItems());
         out.putInt("Hunger", hunger()); out.putInt("HungerClock", hungryClock); out.putInt("Effort", effortTicks);
         if (workAnchor != null) out.store("WorkAnchor", BlockPos.CODEC, workAnchor);
     }
     @Override protected void readAdditionalSaveData(ValueInput in) {
         super.readAdditionalSaveData(in);
+        setSkin(in.getIntOr("Skin", 0));
         ContainerHelper.loadAllItems(in.childOrEmpty("Backpack"), backpack.getItems());
         entityData.set(HUNGER, Math.clamp(in.getIntOr("Hunger", 20), 0, 20));
         hungryClock = Math.clamp(in.getIntOr("HungerClock", 0), 0, 399);

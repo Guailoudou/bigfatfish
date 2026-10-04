@@ -95,7 +95,30 @@ def main():
     for yy in [98,100,102]: r(3,yy,4,yy+1,(47,64,120))
     r(195,68,199,70,(66,95,163)); r(198,67,200,68,(66,95,163)); r(199,66,200,68,(66,95,163))
     r(195,68,196,69,(255,255,255)); r(196,66,197,67,(66,95,163))
-    png(ASSETS / 'textures/entity/big_fat_fish.png',256,128,pix)
+    for outfit in ['maid', 'summer']:
+        detailed, draw = canvas(512,256)
+        for y in range(256):
+            for x in range(512): detailed[y*512+x] = pix[(y//2)*256+x//2]
+        draw(18,146,36,163,(251,224,213))
+        for eye in [21,29]:
+            draw(eye-1,151,eye+5,152,(34,39,72))
+            draw(eye,152,eye+4,157,(255,250,247))
+            draw(eye+1,152,eye+4,157,(50,105,179))
+            draw(eye+2,152,eye+3,156,(23,47,91))
+            draw(eye+1,152,eye+2,153,(255,255,255))
+            draw(eye+2,156,eye+4,157,(96,189,230))
+        draw(20,158,23,159,(247,172,177)); draw(31,158,34,159,(247,172,177))
+        draw(26,160,29,161,(177,93,112)); draw(27,161,29,162,(235,146,160))
+        for y in range(128):
+            for x in range(128,256):
+                t=min(1,y/76); shine=max(0,1-abs((x%17)-8)/8)*17
+                c=tuple(int(a+(b-a)*t+shine) for a,b in zip((40,62,128),(61,152,194)))
+                draw(x,y,x+1,y+1,c)
+        if outfit=='summer':
+            draw(384,0,512,128,(237,243,255))
+            draw(256,0,384,128,(249,248,255))
+            draw(0,192,64,256,(244,247,255))
+        png(ASSETS / f'textures/entity/{outfit}.png',512,256,detailed)
 
     js(DATA / 'recipe/cooked_rice.json',{'type':'minecraft:crafting_shapeless','ingredients':['bigfatfish:rice']*3+['minecraft:bowl'],'result':{'id':'bigfatfish:cooked_rice','count':1}})
     js(DATA / 'recipe/stone_mill.json',{'type':'minecraft:crafting_shaped','pattern':['SWS','CCC','CCC'],'key':{'S':'minecraft:stone_slab','W':'minecraft:stick','C':'minecraft:cobblestone'},'result':{'id':'bigfatfish:stone_mill','count':1}})
@@ -136,9 +159,11 @@ def main():
     }
     for event,lines in dialogue.items():
         for i,line in enumerate(lines): zh[f'dialogue.bigfatfish.{event}.{i}']='〈大肥鱼〉'+line
+    zh.update({'skin.bigfatfish.maid':'鲸尾女仆', 'skin.bigfatfish.summer':'白蓝夏日', 'screen.bigfatfish.skin':'外观 · 点击切换'})
     js(ASSETS / 'lang/zh_cn.json',zh)
     en=dict(zh)
     en.update({'entity.bigfatfish.big_fat_fish':'Big Fat Fish','block.bigfatfish.rice_crop':'Rice Plant','block.bigfatfish.stone_mill':'Stone Mill','item.bigfatfish.paddy':'Paddy','item.bigfatfish.rice':'Rice Grain','item.bigfatfish.cooked_rice':'Bowl of Rice','item.bigfatfish.stone_mill':'Stone Mill','item.bigfatfish.big_fat_fish_spawn_egg':'Big Fat Fish Spawn Egg','screen.bigfatfish.backpack':'Backpack (27 slots)','screen.bigfatfish.mainhand':'Right (main)','screen.bigfatfish.offhand':'Left','screen.bigfatfish.hunger':'Food: %s/20'})
+    en.update({'skin.bigfatfish.maid':'Whale Maid', 'skin.bigfatfish.summer':'Summer Blue', 'screen.bigfatfish.skin':'Skin: select below'})
     js(ASSETS / 'lang/en_us.json',en)
 
 if __name__ == '__main__': main()

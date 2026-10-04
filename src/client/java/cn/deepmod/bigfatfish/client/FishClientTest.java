@@ -22,6 +22,7 @@ public final class FishClientTest implements FabricClientGameTest {
                 var fish = BigFatFishMod.BIG_FAT_FISH.create(level, EntitySpawnReason.COMMAND);
                 fish.setPos(0.5, -60, 1.5); fish.setYRot(0); fish.yBodyRot = 0; fish.yHeadRot = 0;
                 fish.tame(player); fish.setNoAi(true);
+                fish.setSkin(0);
                 fish.backpack.setItem(0, new ItemStack(BigFatFishMod.COOKED_RICE, 12));
                 fish.backpack.setItem(1, new ItemStack(BigFatFishMod.PADDY, 24));
                 fish.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_HOE));
@@ -52,7 +53,21 @@ public final class FishClientTest implements FabricClientGameTest {
                     || !menu.slots.get(27).getItem().is(Items.IRON_HOE)) throw new AssertionError("Client slots must match server storage and hands");
             });
             context.takeScreenshot("bigfatfish-backpack");
+            context.clickScreenButton("skin.bigfatfish.summer");
+            connection.waitForServerboundPackets();
+            context.waitTicks(5);
+            connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
+            world.getServer().runOnServer(server -> {
+                if (((BigFatFishEntity)connection.getServerLevel().getEntity(entityId)).skin() != 1)
+                    throw new AssertionError("Skin button must update server entity");
+            });
+            context.runOnClient(mc -> {
+                if (((FishScreen)mc.gui.screen()).getMenu().fish().skin() != 1) throw new AssertionError("Skin must synchronize to client");
+            });
+            context.takeScreenshot("bigfatfish-summer-backpack");
             context.setScreen(() -> null);
+            context.waitTicks(5);
+            context.takeScreenshot("bigfatfish-summer-model");
         }
     }
 }

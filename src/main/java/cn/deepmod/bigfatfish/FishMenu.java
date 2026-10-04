@@ -27,6 +27,11 @@ public final class FishMenu extends AbstractContainerMenu {
         if (fish != null && !inv.player.level().isClientSide()) fish.setBackpackOpen(true);
     }
     public BigFatFishEntity fish() { return fish; }
+    @Override public boolean clickMenuButton(Player player, int id) {
+        if (player.level().isClientSide() || !stillValid(player) || id < 0 || id > 1) return false;
+        fish.setSkin(id);
+        return true;
+    }
     @Override public boolean stillValid(Player player) { return fish != null && fish.isAlive() && fish.isOwnedBy(player) && player.distanceToSqr(fish) <= 64; }
     @Override public void removed(Player player) {
         super.removed(player);

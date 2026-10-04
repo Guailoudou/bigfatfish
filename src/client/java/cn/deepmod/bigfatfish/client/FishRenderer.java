@@ -13,12 +13,13 @@ public final class FishRenderer extends MobRenderer<BigFatFishEntity, FishRender
         items = context.getItemModelResolver();
         addLayer(new ItemInHandLayer<>(this));
     }
-    public static final class State extends HumanoidRenderState { public boolean sitting; }
+    public static final class State extends HumanoidRenderState { public boolean sitting; public int skin; }
     @Override public State createRenderState() { return new State(); }
-    @Override public Identifier getTextureLocation(State state) { return BigFatFishMod.id("textures/entity/big_fat_fish.png"); }
+    @Override public Identifier getTextureLocation(State state) { return BigFatFishMod.id("textures/entity/" + (state.skin == 1 ? "summer" : "maid") + ".png"); }
     @Override public void extractRenderState(BigFatFishEntity entity, State state, float partialTick) {
         super.extractRenderState(entity, state, partialTick);
         HumanoidMobRenderer.extractHumanoidRenderState(entity, state, partialTick, items);
         state.sitting = entity.isInSittingPose();
+        state.skin = entity.skin();
     }
 }
