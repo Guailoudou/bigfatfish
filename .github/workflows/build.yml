@@ -1,0 +1,50 @@
+name: Build Fabric Mod
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Check Java versions
+        run: |
+          java -version
+          javac -version
+
+      - name: Build and run server GameTests
+        run: bash ./gradlew --no-daemon build runGametest
+
+      - name: Upload mod JAR
+        uses: actions/upload-artifact@v6
+        with:
+          name: bigfatfish-mc26.3-${{ github.sha }}
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: gametest-report
+          path: build/gametest-results.xml
+          if-no-files-found: ignore

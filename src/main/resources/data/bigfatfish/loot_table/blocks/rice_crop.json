@@ -1,0 +1,41 @@
+{
+  "type": "minecraft:block",
+  "modifier": {
+    "type": "minecraft:explosion_decay"
+  },
+  "pools": [
+    {
+      "condition": {
+        "type": "minecraft:match_block",
+        "blocks": "bigfatfish:rice_crop",
+        "state": {
+          "part": "0"
+        }
+      },
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "bigfatfish:paddy"
+        }
+      ]
+    },
+    {
+      "condition": {
+        "type": "minecraft:match_block",
+        "blocks": "bigfatfish:rice_crop",
+        "state": {
+          "part": "0",
+          "age": "7"
+        }
+      },
+      "rolls": 2,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "bigfatfish:paddy"
+        }
+      ]
+    }
+  ]
+}

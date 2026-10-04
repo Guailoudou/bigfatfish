@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SWS",
+    "CCC",
+    "CCC"
+  ],
+  "key": {
+    "S": "minecraft:stone_slab",
+    "W": "minecraft:stick",
+    "C": "minecraft:cobblestone"
+  },
+  "result": {
+    "id": "bigfatfish:stone_mill",
+    "count": 1
+  }
+}

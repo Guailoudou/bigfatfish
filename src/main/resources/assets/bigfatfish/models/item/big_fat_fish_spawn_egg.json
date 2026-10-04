@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "bigfatfish:item/big_fat_fish_spawn_egg"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "bigfatfish:rice",
+    "bigfatfish:rice",
+    "bigfatfish:rice",
+    "minecraft:bowl"
+  ],
+  "result": {
+    "id": "bigfatfish:cooked_rice",
+    "count": 1
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "bigfatfish",
+  "version": "${version}",
+  "name": "大肥鱼",
+  "description": "爱吃米饭的蓝发鲸鱼女仆，以及水稻、石磨与米饭。",
+  "environment": "*",
+  "entrypoints": {"main": ["cn.deepmod.bigfatfish.BigFatFishMod"], "client": ["cn.deepmod.bigfatfish.client.BigFatFishClient"], "fabric-gametest": ["cn.deepmod.bigfatfish.FishGameTests"], "fabric-client-gametest": ["cn.deepmod.bigfatfish.client.FishClientTest"]},
+  "depends": {"fabricloader": ">=0.19.5", "minecraft": "26.3", "java": ">=25", "fabric-api": "*"}
+}
