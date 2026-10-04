@@ -16,7 +16,11 @@
 
 需要 **Minecraft Java 26.3、Java 25、Fabric Loader 0.19.5 或更新版本，以及 Fabric API 0.161.0+26.3**。
 
-将 `build/libs/big-fat-fish-1.2.0.jar` 与对应 Fabric API 放入游戏实例的 `mods` 文件夹。多人游戏中服务端和客户端均需安装。`-sources.jar` 是源码包，不用于游戏安装。
+将 `build/libs/big-fat-fish-1.2.1.jar` 与对应 Fabric API 放入游戏实例的 `mods` 文件夹。多人游戏中服务端和客户端均需安装。`-sources.jar` 是源码包，不用于游戏安装。
+
+**1.2.1 修复安装 Sodium / Iris 时角色只剩影子的问题**：曲面通过原版自定义几何接口直接提交，不再修改零尺寸方块的面。已在 Sodium 0.9.2 + Iris 1.11.7（26.3 Fabric，无启用光影包）及原版渲染路径验证成年、幼年、两套皮肤和动画。升级时替换旧 JAR，角色和背包存档格式不变。
+
+Sodium / Iris 验证截图：[成年世界渲染](docs/screenshots/sodium-iris-adult.png) · [幼年换肤预览](docs/screenshots/sodium-iris-juvenile.png)。
 
 GitHub 在线编译：进入仓库的 **Actions → Build Fabric Mod**，打开一次成功的运行，在页面底部 **Artifacts** 下载 `bigfatfish-mc26.3-...`，解压后取得可安装的 JAR。下载 artifact 需要登录 GitHub。每次推送 `main` 或提交 PR 都会自动编译并运行服务端 GameTest，也可以通过 **Run workflow** 手动编译。JAR artifact 保留 90 天，测试报告另存为 `gametest-report`。
 
@@ -88,4 +92,4 @@ C C C
 
 服务端测试报告位于 `build/gametest-results.xml`；客户端测试截图位于 `build/clienttest/screenshots/`。13 项服务端测试覆盖水稻高度及单次掉落、深水拒绝、保存和权限、背包满时不破坏作物及清空后恢复、饥饿优先级及喂饭恢复、持剑攻击、工作边界及回座、石磨与食品数值，以及自然生成两种年龄、幼年一格尺寸、喂饭加速与自然成年、年龄存档、幼年不工作不战斗且会讨饭、独立驯服概率和猫的跟随距离。客户端测试检查四套外观、成熟前后模型及尺寸同步、实际换肤菜单、动作的网络同步与骨骼抬手方向，并保存截图。
 
-角色网格由标准库脚本 `python tools/generate_character.py` 生成，分别输出成年与幼年压缩网格和材质贴图；`CharacterMesh.java` 使用原版公开的四边形 API 加载，`FishModel.java` 控制骨骼和动作，无第三方模型运行库。脸部睁眼、闭眼贴图依据参考图通过 imagegen 制作并保存在资源目录。其余物品和作物资源、对白通过 `python tools/generate_assets.py` 生成。
+角色网格由标准库脚本 `python tools/generate_character.py` 生成，分别输出成年与幼年压缩网格和材质贴图；`CharacterMesh.java` 使用原版 `submitCustomGeometry` 接口提交曲面，`FishModel.java` 控制骨骼和动作，无第三方模型运行库。客户端测试额外检查四套外观截图中的实际角色像素，防止模型消失但实体同步仍正常时误报成功。可将 Sodium 和 Iris 的对应版本 JAR 放入隔离测试目录 `build/clienttest/mods` 后运行客户端测试。脸部睁眼、闭眼贴图依据参考图通过 imagegen 制作并保存在资源目录。其余物品和作物资源、对白通过 `python tools/generate_assets.py` 生成。

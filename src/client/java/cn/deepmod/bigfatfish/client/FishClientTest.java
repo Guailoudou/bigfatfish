@@ -73,11 +73,11 @@ public final class FishClientTest implements FabricClientGameTest {
             });
             context.waitTicks(5);
             context.runOnClient(mc -> {mc.player.setYRot(180);mc.player.setXRot(12);});
-            context.takeScreenshot("adult-summer-front");
+            assertVisible(context, "adult-summer-front", false);
             world.getServer().runOnServer(server -> {
                 var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);fish.setSkin(0);
             });
-            context.waitTicks(5);context.takeScreenshot("adult-maid-front");
+            context.waitTicks(5);assertVisible(context, "adult-maid-front", false);
             for(int angle : new int[]{90,180}) {
                 world.getServer().runOnServer(server -> {
                     var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);
@@ -96,9 +96,9 @@ public final class FishClientTest implements FabricClientGameTest {
                 var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
                 if(!fish.isBaby() || fish.getBbHeight()!=1) throw new AssertionError("Juvenile age and one-block dimensions synchronize");
             });
-            context.takeScreenshot("juvenile-maid-backpack");
+            assertVisible(context, "juvenile-maid-backpack", true);
             context.clickScreenButton("skin.bigfatfish.summer");connection.waitForServerboundPackets();context.waitTicks(5);
-            context.takeScreenshot("juvenile-summer-backpack");
+            assertVisible(context, "juvenile-summer-backpack", true);
             world.getServer().runOnServer(server -> ((BigFatFishEntity)connection.getServerLevel().getEntity(entityId)).emote(5));
             context.waitTicks(20);
             context.runOnClient(mc -> {
@@ -133,5 +133,20 @@ public final class FishClientTest implements FabricClientGameTest {
             });
             context.takeScreenshot("adult-after-growth");context.setScreen(() -> null);
         }
+    }
+    /** Check actual rendered hair pixels, so an empty mesh cannot pass on entity state alone. */
+    private static void assertVisible(ClientGameTestContext context, String name, boolean menu) {
+        var screenshot=context.takeScreenshot(name);
+        try {
+            var image=javax.imageio.ImageIO.read(screenshot.toFile());
+            int x0=(int)(image.getWidth()*(menu ? .63 : .42)), x1=(int)(image.getWidth()*(menu ? .79 : .58));
+            int y0=(int)(image.getHeight()*(menu ? .28 : .38)), y1=(int)(image.getHeight()*(menu ? .53 : .74));
+            int hairPixels=0;
+            for(int y=y0;y<y1;y++) for(int x=x0;x<x1;x++) {
+                int pixel=image.getRGB(x,y), r=(pixel>>16)&255, g=(pixel>>8)&255, b=pixel&255;
+                if(b>80 && b>r*1.25 && b>g*1.08) hairPixels++;
+            }
+            if(hairPixels<(x1-x0)*(y1-y0)/20) throw new AssertionError("Character is invisible in " + name);
+        } catch(java.io.IOException e) { throw new AssertionError("Cannot inspect rendered character", e); }
     }
 }

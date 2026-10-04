@@ -9,7 +9,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 
 public final class FishRenderer extends MobRenderer<BigFatFishEntity, FishRenderer.State, FishModel> {
@@ -22,12 +21,17 @@ public final class FishRenderer extends MobRenderer<BigFatFishEntity, FishRender
         addLayer(new ItemInHandLayer<>(this));
         addLayer(new RenderLayer<State,FishModel>(this) {
             @Override public void submit(PoseStack pose, SubmitNodeCollector collector, int light, State state, float yaw, float pitch) {
-                if (state.isInvisible) return;
                 var m=getParentModel();
+                var type=FishRenderer.this.getRenderType(state, !state.isInvisible, state.isInvisible && !state.isInvisibleToPlayer, state.appearsGlowing());
+                if (type==null) return;
+                int overlay=LivingEntityRenderer.getOverlayCoords(state,0);
+                int color=state.isInvisible ? 0x26FFFFFF : 0xFFFFFFFF;
+                m.mesh.bodySurface().submit(pose,collector,type,light,overlay,color);
                 pose.pushPose();m.head.translateAndRotate(pose);
                 boolean closed = ((int)state.ageInTicks % 93) < 3 || state.emote == 3 || state.emote == 4;
-                collector.submitModelPart(m.face,pose,RenderTypes.entityCutout(BigFatFishMod.id("textures/entity/" + (closed ? "face_closed" : "face") + ".png")),light,
-                    state.hasRedOverlay ? OverlayTexture.pack(0,OverlayTexture.RED_OVERLAY_V) : OverlayTexture.NO_OVERLAY,null);
+                var texture=BigFatFishMod.id("textures/entity/" + (closed ? "face_closed" : "face") + ".png");
+                var faceType=state.isInvisible ? (state.isInvisibleToPlayer ? RenderTypes.outline(texture) : RenderTypes.entityTranslucent(texture)) : RenderTypes.entityCutout(texture);
+                m.mesh.faceSurface().submit(pose,collector,faceType,light,overlay,color);
                 pose.popPose();
             }
         });

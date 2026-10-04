@@ -10,11 +10,12 @@ import com.mojang.blaze3d.vertex.PoseStack;
 /** Smooth surfaces with independent juvenile proportions, outfits, curls and expressive poses. */
 public final class FishModel extends HumanoidModel<FishRenderer.State> {
     final ModelPart face;
+    final CharacterMesh.Loaded mesh;
     private final ModelPart tail;
     private final List<ModelPart> maid = new ArrayList<>(), summer = new ArrayList<>(), hair = new ArrayList<>();
     public FishModel(boolean juvenile) { this(CharacterMesh.load(juvenile)); }
     private FishModel(CharacterMesh.Loaded mesh) {
-        super(mesh.root()); face = mesh.face(); tail = body.getChild("tail");
+        super(mesh.root()); this.mesh=mesh; face = mesh.face(); tail = body.getChild("tail");
         for (String name : List.of("maid_head","summer_head")) (name.startsWith("maid") ? maid : summer).add(head.getChild(name));
         maid.add(body.getChild("maid_body")); summer.add(body.getChild("summer_body"));
         for (ModelPart arm : List.of(leftArm,rightArm)) maid.add(arm.getChild("maid_arm"));
