@@ -368,6 +368,8 @@ public final class FishGameTests {
     @GameTest(maxTicks = 120) public void emptyFarmlandConsumesOneSeed(GameTestHelper h) {
         for (int x = 0; x < 8; x++) for (int z = 0; z < 8; z++) h.setBlock(x, 1, z, Blocks.DIRT);
         BlockPos p = new BlockPos(4, 2, 3); h.setBlock(p.below(), Blocks.FARMLAND);
+        // Keep the empty test plot from randomly drying before the worker scans.
+        h.setBlock(p.below().east(), Blocks.WATER);
         var fish = farmWorker(h, 3.5F, 3.5F);
         fish.backpack.setItem(0, new ItemStack(Items.CARROT, 2));
         h.succeedWhen(() -> {
@@ -472,55 +474,114 @@ public final class FishGameTests {
             h.assertTrue(fish.position().distanceToSqr(net.minecraft.world.phys.Vec3.atBottomCenterOf(fish.anchor())) <= 1024, "Worker stays in range");
         });
     }
-    @GameTest public void riverRiceBeforeChunkPublication(GameTestHelper h) {
-        // Deliberately absent from ServerChunkCache: consulting ServerLevel
-        // while placing the crop would synchronously load the wrong chunk.
-        var position=new net.minecraft.world.level.ChunkPos(100000,100000);
+    @GameTest public void riverRiceFeatureConditions(GameTestHelper h) {
         var level=h.getLevel();
-        var chunk=new net.minecraft.world.level.chunk.LevelChunk(level,position);
-        var river=level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
-            .getOrThrow(net.minecraft.world.level.biome.Biomes.RIVER);
-        chunk.fillBiomesFromNoise((x,y,z)->river);
-        int flags=net.minecraft.world.level.block.Block.UPDATE_CLIENTS
-            |net.minecraft.world.level.block.Block.UPDATE_SKIP_ON_PLACE;
-        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Fixture chunk starts unpublished");
-        for(int age=0;age<=7;age++) {
-            BlockPos root=new BlockPos(position.getMinBlockX()+1+age,64,position.getMinBlockZ()+1);
-            chunk.setBlockState(root.below(),Blocks.DIRT.defaultBlockState(),flags);
-            chunk.setBlockState(root,Blocks.WATER.defaultBlockState(),flags);
-            h.assertTrue(RiceBlock.canPlant(chunk,root),"Unpublished chunk supports rice planting");
-            RiverRice.plant(chunk,root,age);
-            int height=age==7 ? 3 : age>=4 ? 2 : 1;
+        var feature=level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.FEATURE)
+            .getOrThrow(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.FEATURE,BigFatFishMod.id("river_rice"))).value();
+        var generator=level.getChunkSource().getGenerator();
+        var random=net.minecraft.util.RandomSource.create(123);
+        BlockPos root=h.absolutePos(new BlockPos(3,2,3));
+        for(int attempt=0;attempt<64;attempt++) {
+            level.setBlock(root.below(),Blocks.DIRT.defaultBlockState(),2);
+            level.setBlock(root,Blocks.WATER.defaultBlockState(),2);
+            level.setBlock(root.above(),Blocks.AIR.defaultBlockState(),2);
+            level.setBlock(root.above(2),Blocks.AIR.defaultBlockState(),2);
+            level.setBlock(root.east(),Blocks.DIRT.defaultBlockState(),2);
+            h.assertTrue(feature.place(level,generator,random,root),"Registered feature accepts shallow water beside a bank");
+            int age=level.getBlockState(root).getValue(RiceBlock.AGE),height=age==7?3:age>=4?2:1;
             for(int part=0;part<3;part++) {
-                var state=chunk.getBlockState(root.above(part));
-                h.assertTrue(part<height ? state.is(BigFatFishMod.RICE_CROP)
-                    && state.getValue(RiceBlock.AGE)==age && state.getValue(RiceBlock.PART)==part
-                    : state.isAir(),"Direct generation produces the correct crop height and stage");
+                var state=level.getBlockState(root.above(part));
+                h.assertTrue(part<height ? state.is(BigFatFishMod.RICE_CROP) && state.getValue(RiceBlock.PART)==part
+                    && state.getValue(RiceBlock.AGE)==age : state.isAir(),"Random age produces matching rice parts");
             }
-            h.assertTrue(chunk.getFluidState(root).isSource(),"Generated root preserves its water source");
+            h.assertTrue(level.getFluidState(root).isSource(),"Generated root retains source water");
         }
-        // Populate alternating shallow-water and dry-bank strips in the same
-        // unpublished chunk, including its border. setBlockState updates the
-        // actual heightmaps used by the production generate callback.
-        for(int x=0;x<16;x++) for(int z=3;z<16;z++) {
-            BlockPos root=new BlockPos(position.getMinBlockX()+x,64,position.getMinBlockZ()+z);
-            chunk.setBlockState(root.below(),Blocks.DIRT.defaultBlockState(),flags);
-            chunk.setBlockState(root,(z%2==0 ? Blocks.DIRT : Blocks.WATER).defaultBlockState(),flags);
+        for(int mode=0;mode<6;mode++) {
+            level.setBlock(root,Blocks.WATER.defaultBlockState(),2);
+            level.setBlock(root.below(),Blocks.DIRT.defaultBlockState(),2);
+            level.setBlock(root.above(),Blocks.AIR.defaultBlockState(),2);
+            level.setBlock(root.above(2),Blocks.AIR.defaultBlockState(),2);
+            for(var d:net.minecraft.core.Direction.Plane.HORIZONTAL) level.setBlock(root.relative(d),Blocks.AIR.defaultBlockState(),2);
+            if(mode!=0) level.setBlock(root.east(),Blocks.DIRT.defaultBlockState(),2);
+            if(mode==1) level.setBlock(root.below(),Blocks.WATER.defaultBlockState(),2);
+            if(mode==2) level.setBlock(root.above(),Blocks.WATER.defaultBlockState(),2);
+            if(mode==3) level.setBlock(root.above(2),Blocks.STONE.defaultBlockState(),2);
+            if(mode==4) level.setBlock(root,Blocks.WATER.defaultBlockState().setValue(net.minecraft.world.level.block.LiquidBlock.LEVEL,1),2);
+            if(mode==5) level.setBlock(root.below(),Blocks.STONE.defaultBlockState(),2);
+            var before=level.getBlockState(root);
+            h.assertTrue(!feature.place(level,generator,random,root),"Rejects missing bank, deep water, obstruction, flowing water and bad soil: "+mode);
+            h.assertTrue(level.getBlockState(root).equals(before),"Rejected placement preserves original blocks");
         }
-        for(int attempt=0;attempt<32;attempt++) RiverRice.generate(level,chunk);
-        int generated=0;
-        for(int x=1;x<15;x++) for(int z=3;z<15;z++) {
-            BlockPos root=new BlockPos(position.getMinBlockX()+x,64,position.getMinBlockZ()+z);
-            if(chunk.getBlockState(root).is(BigFatFishMod.RICE_CROP)) generated++;
+        h.succeed();
+    }
+    @GameTest(structure="bigfatfish:work_area") public void riverRicePlacementAndSeed(GameTestHelper h) {
+        var level=h.getLevel();
+        var placed=level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.PLACED_FEATURE).getOrThrow(RiverRice.PLACED).value();
+        var biomes=level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        // The GameTest flat generator strips vegetation; use normal Overworld
+        // generation settings when exercising vanilla's biome filter.
+        var generator=new net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator(
+            new net.minecraft.world.level.biome.FixedBiomeSource(biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.RIVER)),
+            level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.NOISE_SETTINGS)
+                .getOrThrow(net.minecraft.world.level.levelgen.NoiseGeneratorSettings.OVERWORLD));
+        int step=net.minecraft.world.level.levelgen.GenerationStep.Decoration.VEGETAL_DECORATION.ordinal();
+        for(var biome:biomes.listElements().toList()) {
+            var settings=biome.value().getGenerationSettings();
+            h.assertTrue(settings.hasFeature(placed)==biome.is(net.minecraft.world.level.biome.Biomes.RIVER),"Rice feature is added only to river biomes");
+            if(biome.is(net.minecraft.world.level.biome.Biomes.RIVER))
+                h.assertTrue(settings.features().get(step).stream().anyMatch(f->f.value()==placed),"Rice runs during vanilla vegetation decoration");
         }
-        h.assertTrue(generated>0,"The real generation callback planted river rice before publication");
-        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Generation does not request publication or synchronous loading");
+        BlockPos origin=h.absolutePos(new BlockPos(16,4,16));
+        java.util.List<net.minecraft.world.level.block.state.BlockState> first=null;
+        for(int replay=0;replay<4;replay++) {
+            if(replay==0 || replay==3) {
+                var biome=biomes.getOrThrow(replay==3 ? net.minecraft.world.level.biome.Biomes.PLAINS : net.minecraft.world.level.biome.Biomes.RIVER);
+                var result=net.minecraft.server.commands.FillBiomeCommand.fill(level,origin.offset(-4,-4,-4),origin.offset(20,4,20),biome);
+                h.assertTrue(result.right().isEmpty(),"Set fixture biome: "+result);
+            }
+            for(int x=-1;x<=16;x++) for(int z=-1;z<=16;z++) {
+                BlockPos p=origin.offset(x,0,z);
+                level.setBlock(p.below(),Blocks.DIRT.defaultBlockState(),2);
+                level.setBlock(p,(z%2==0?Blocks.DIRT:Blocks.WATER).defaultBlockState(),2);
+                // GameTest adds a barrier roof; remove it over the artificial
+                // shoreline so the real surface heightmap can see the water.
+                for(int y=p.getY()+1;y<=Math.ceil(h.getBoundsWithPadding().maxY);y++)
+                    level.setBlock(new BlockPos(p.getX(),y,p.getZ()),Blocks.AIR.defaultBlockState(),2);
+            }
+            // Vanilla decoration seeds each feature. Unrelated runtime RNG calls must not matter.
+            for(int i=0;i<replay*117;i++) level.getRandom().nextLong();
+            var random=new net.minecraft.world.level.levelgen.WorldgenRandom(new net.minecraft.world.level.levelgen.XoroshiroRandomSource(0));
+            long decoration=random.setDecorationSeed(replay==2?67890:12345,origin.getX(),origin.getZ());
+            random.setFeatureSeed(decoration,0,step);
+            int surface=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR,origin.getX(),origin.getZ()+1);
+            h.assertTrue(surface==origin.getY(),"Heightmap finds fixture water: "+surface+" expected "+origin.getY());
+            var placer=new net.minecraft.world.level.levelgen.placement.FeaturePlacer(level,generator);
+            for(int attempt=0;attempt<32;attempt++) placer.placeWithBiomeCheck(placed,random,origin);
+            var snapshot=new java.util.ArrayList<net.minecraft.world.level.block.state.BlockState>();
+            int count=0;
+            for(int x=0;x<16;x++) for(int z=0;z<16;z++) for(int part=0;part<3;part++) {
+                var state=level.getBlockState(origin.offset(x,part,z));snapshot.add(state);
+                if(part==0 && state.is(BigFatFishMod.RICE_CROP)) count++;
+            }
+            if(replay==3) {
+                h.assertTrue(count==0,"Native biome filter rejects identical shallow-water terrain in plains");
+                continue;
+            }
+            h.assertTrue(count>0,"Loaded placed feature successfully finds water with the ocean floor heightmap");
+            if(replay==0) first=snapshot;
+            else h.assertTrue(snapshot.equals(first)==(replay==1),"Same decoration seed reproduces positions and ages; different seed changes them");
+        }
+        h.succeed();
+    }
+    @GameTest public void plantingDoesNotLoadChunks(GameTestHelper h) {
+        var level=h.getLevel();var position=new net.minecraft.world.level.ChunkPos(100000,100000);
         var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,3,2,3);fish.setNoAi(true);
         fish.backpack.setItem(0,new ItemStack(BigFatFishMod.PADDY,3));
         BlockPos far=new BlockPos(position.getMinBlockX()+1,64,position.getMinBlockZ()+3);
-        h.assertTrue(!fish.plantFromBackpack(level,far,BigFatFishMod.RICE_CROP),"Worker refuses planting in an unpublished chunk");
-        h.assertTrue(fish.backpack.getItem(0).getCount()==3,"Failed unloaded planting preserves seed inventory");
-        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Worker planting does not synchronously load the chunk");
+        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Target starts unloaded");
+        h.assertTrue(!fish.plantFromBackpack(level,far,BigFatFishMod.RICE_CROP),"Worker refuses planting in an unloaded chunk");
+        h.assertTrue(fish.backpack.getItem(0).getCount()==3,"Failed unloaded planting preserves seeds");
+        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Worker did not load the chunk");
         h.succeed();
     }
     @GameTest public void millAndFood(GameTestHelper h) {

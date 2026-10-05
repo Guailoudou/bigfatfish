@@ -4,7 +4,6 @@ import java.util.function.Function;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
 import net.fabricmc.fabric.api.biome.v1.BiomeSelectors;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
@@ -56,7 +55,7 @@ public final class BigFatFishMod implements ModInitializer {
             .add(Attributes.ATTACK_DAMAGE, 1).add(Attributes.ATTACK_SPEED, 4)
             .add(Attributes.FOLLOW_RANGE, 32).add(Attributes.ARMOR, 0));
         BiomeModifications.addSpawn(BiomeSelectors.includeByKey(Biomes.RIVER, Biomes.FROZEN_RIVER), MobCategory.CREATURE, BIG_FAT_FISH, 2, 1, 1);
-        ServerChunkEvents.CHUNK_GENERATE.register(RiverRice::generate);
+        RiverRice.register();
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.NATURAL_BLOCKS).register(e -> { e.accept(PADDY); e.accept(STONE_MILL); });
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(e -> { e.accept(RICE); e.accept(COOKED_RICE); });
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.SPAWN_EGGS).register(e -> e.accept(SPAWN_EGG));
