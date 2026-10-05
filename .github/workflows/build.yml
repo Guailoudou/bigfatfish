@@ -28,6 +28,9 @@ jobs:
           java -version
           javac -version
 
+      - name: Check pixel models and textures
+        run: python3 tools/check_pixel_import.py
+
       - name: Build and run server GameTests
         run: bash ./gradlew --no-daemon build runGametest
 

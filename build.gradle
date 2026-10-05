@@ -27,3 +27,21 @@ dependencies {
 processResources { inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand version: project.version } }
 tasks.withType(JavaCompile).configureEach { options.release = 25; options.encoding = 'UTF-8' }
 java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
+
+tasks.register('cleanupClientTestWorlds') {
+    doLast {
+        def runDirectory = layout.buildDirectory.dir('clienttest').get().asFile.canonicalFile
+        def saves = new File(runDirectory, 'saves').canonicalFile
+        def manifest = new File(runDirectory, 'worlds-to-delete.txt')
+        if (!manifest.exists()) return
+        manifest.readLines('UTF-8').findAll { !it.isBlank() }.unique().each { name ->
+            def save = new File(saves, name).canonicalFile
+            if (save.parentFile != saves) throw new GradleException("Refusing to delete outside client test saves: ${save}")
+            project.delete(save)
+            if (save.exists()) throw new GradleException("Cannot delete closed client test world: ${save}")
+            logger.lifecycle("Removed closed client test world: ${name}")
+        }
+        if (!manifest.delete()) throw new GradleException('Cannot remove client test cleanup manifest')
+    }
+}
+tasks.named('runClienttest') { finalizedBy('cleanupClientTestWorlds') }

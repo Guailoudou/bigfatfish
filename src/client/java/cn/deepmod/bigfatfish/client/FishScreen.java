@@ -10,6 +10,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 
 public final class FishScreen extends AbstractContainerScreen<FishMenu> {
     private final Button[] skins = new Button[2];
+    private Button special;
     public FishScreen(FishMenu menu, Inventory inv, Component title) {
         super(menu, inv, title, 304, 233);
         inventoryLabelY = 139;
@@ -20,13 +21,21 @@ public final class FishScreen extends AbstractContainerScreen<FishMenu> {
             final int skin = i;
             skins[i] = addRenderableWidget(Button.builder(Component.translatable("skin.bigfatfish." + (i == 0 ? "maid" : "summer")),
                 button -> minecraft.gameMode.handleInventoryButtonClick(menu.containerId, skin))
-                .bounds(leftPos + 184, topPos + 168 + i * 24, 112, 20).build());
+                .bounds(leftPos + 184, topPos + 165 + i * 21, 112, 18).build());
         }
+        special=addRenderableWidget(Button.builder(Component.translatable("screen.bigfatfish.special"),
+            button->minecraft.gameMode.handleInventoryButtonClick(menu.containerId,2))
+            .bounds(leftPos+184,topPos+207,112,18).build());
         containerTick();
     }
     @Override public void containerTick() {
         super.containerTick();
         for (int i = 0; i < 2; i++) if (skins[i] != null) skins[i].active = menu.fish() != null && menu.fish().skin() != i;
+        if(special!=null && menu.fish()!=null) {
+            var fish=menu.fish();special.active=true;
+            special.setMessage(Component.translatable("screen.bigfatfish.special"));
+            special.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("screen.bigfatfish.special_hint")));
+        }
     }
     @Override public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float tick) {
         super.extractBackground(g, mouseX, mouseY, tick);
@@ -34,7 +43,7 @@ public final class FishScreen extends AbstractContainerScreen<FishMenu> {
         g.fill(x, y, x + imageWidth, y + imageHeight, 0xFF243552);
         g.outline(x, y, imageWidth, imageHeight, 0xFF91B6E5);
         g.fill(x + 178, y + 8, x + 298, y + 158, 0xFF152136);
-        if (menu.fish() != null) InventoryScreen.extractEntityInInventoryFollowsMouse(g, x + 180, y + 22, x + 296, y + 154, 64, 0.0625F, x + 220, y + 88, menu.fish());
+        if (menu.fish() != null) InventoryScreen.extractEntityInInventoryFollowsMouse(g, x + 180, y + 22, x + 296, y + 132, 54, 0.0625F, x + 220, y + 80, menu.fish());
         for (var slot : menu.slots) {
             g.fill(x + slot.x - 1, y + slot.y - 1, x + slot.x + 17, y + slot.y + 17, 0xFF152136);
             g.outline(x + slot.x - 1, y + slot.y - 1, 18, 18, 0xFF7191B9);
@@ -43,14 +52,15 @@ public final class FishScreen extends AbstractContainerScreen<FishMenu> {
     @Override protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         g.text(font, title, 8, 6, 0xFFFFFFFF, false);
         g.text(font, Component.translatable("screen.bigfatfish.skin"), 184, 10, 0xFFB8D5F8, false);
-        if (menu.fish() != null) g.text(font, Component.translatable(menu.fish().isBaby() ? "screen.bigfatfish.juvenile" : "screen.bigfatfish.adult"), 184, 151, 0xFFB8D5F8, false);
+        if (menu.fish() != null) g.text(font, Component.translatable(menu.fish().breedingCooldown()>0 ? "screen.bigfatfish.cooldown" : menu.fish().isBaby() ? "screen.bigfatfish.juvenile" : "screen.bigfatfish.adult",(menu.fish().breedingCooldown()+19)/20), 184, 151, 0xFFB8D5F8, false);
         g.text(font, Component.translatable("screen.bigfatfish.backpack"), 8, 18, 0xFFB8D5F8, false);
         g.text(font, Component.translatable("screen.bigfatfish.mainhand"), 8, 89, 0xFFFFFFFF, false);
         g.text(font, Component.translatable("screen.bigfatfish.offhand"), 104, 89, 0xFFFFFFFF, false);
         var fish = menu.fish();
         if (fish != null) {
+            g.text(font,Component.translatable("screen.bigfatfish.affection",fish.affection()),184,137,fish.affection()<0 ? 0xFFFF7777 : 0xFFFFAFCD,false);
             g.text(font, Component.translatable("screen.bigfatfish.hunger", fish.hunger()), 8, 126, 0xFFFFFFFF, false);
-            g.text(font, Component.translatable("activity.bigfatfish." + fish.activity()), 106, 126, 0xFFB8D5F8, false);
+            g.text(font, Component.translatable(fish.satietyTicks()>0 ? "screen.bigfatfish.full" : "activity.bigfatfish." + fish.activity()), 106, 126, 0xFFB8D5F8, false);
         }
         g.text(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, 0xFFFFFFFF, false);
     }

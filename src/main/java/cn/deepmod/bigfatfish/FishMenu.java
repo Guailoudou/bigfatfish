@@ -28,7 +28,9 @@ public final class FishMenu extends AbstractContainerMenu {
     }
     public BigFatFishEntity fish() { return fish; }
     @Override public boolean clickMenuButton(Player player, int id) {
-        if (player.level().isClientSide() || !stillValid(player) || id < 0 || id > 1) return false;
+        if (player.level().isClientSide() || !stillValid(player)) return false;
+        if(id==2) { fish.specialInteract(player);return true; }
+        if(id<0 || id>1) return false;
         fish.setSkin(id);
         return true;
     }
