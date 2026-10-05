@@ -11,6 +11,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 public final class FishModel extends HumanoidModel<FishRenderer.State> {
     final ModelPart face;
     final CharacterMesh.Loaded mesh;
+    MmdMesh.Pose mmdPose;
     private final ModelPart tail;
     private final ModelPart leftForearm, rightForearm, leftShin, rightShin;
     private final List<ModelPart> maid = new ArrayList<>(), summer = new ArrayList<>(), hair = new ArrayList<>();
@@ -26,6 +27,9 @@ public final class FishModel extends HumanoidModel<FishRenderer.State> {
         for (int i = 0; i < 29; i++) hair.add(head.getChild("hair_"+i));
     }
     @Override public void translateToHand(HumanoidRenderState state, HumanoidArm arm, PoseStack pose) {
+        if(state instanceof FishRenderer.State fish && mmdPose!=null) {
+            MmdMesh.forSkin(fish.skin).hand(pose,mmdPose,arm);return;
+        }
         super.translateToHand(state,arm,pose);
         ModelPart forearm=arm==HumanoidArm.RIGHT?rightForearm:leftForearm;
         forearm.translateAndRotate(pose);
@@ -43,8 +47,13 @@ public final class FishModel extends HumanoidModel<FishRenderer.State> {
         rightShin.xRot=Math.max(0,-rightLeg.xRot)*.65F;
         maid.forEach(p -> p.visible=state.skin==0); summer.forEach(p -> p.visible=state.skin==1);
         float time=state.ageInTicks;
-        tail.yRot=0.4F+(float)Math.sin(time*0.07)*0.12F+state.tailYaw;
+        tail.yRot=0.4F+state.tailIdle+state.tailYaw;
         tail.xRot=(float)Math.sin(time*0.045)*0.035F;
+        for(String outfit:List.of("maid_body","summer_body")) {
+            var cloth=body.getChild(outfit);
+            cloth.xRot=state.clothPitch;
+            cloth.zRot=state.clothSway;
+        }
         for(int i=0;i<hair.size();i++) {
             float response=.75F+(i%5)*.05F;
             hair.get(i).xRot=(float)Math.sin(time*0.055+i*0.32)*0.025F+state.hairPitch*response;
@@ -90,5 +99,6 @@ public final class FishModel extends HumanoidModel<FishRenderer.State> {
                 body.y-=hop;head.y-=hop;leftArm.y-=hop;rightArm.y-=hop;leftLeg.y-=hop;rightLeg.y-=hop;
             }
         }
+        mmdPose=MmdMesh.forSkin(state.skin).pose(this,state);
     }
 }

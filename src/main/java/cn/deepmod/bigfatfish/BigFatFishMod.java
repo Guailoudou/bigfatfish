@@ -26,6 +26,13 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 public final class BigFatFishMod implements ModInitializer {
     public static final String ID = "bigfatfish";
     public static Identifier id(String path) { return Identifier.fromNamespaceAndPath(ID, path); }
+    public static final net.minecraft.sounds.SoundEvent VOICE_IDLE = sound("idle"), VOICE_BEG = sound("beg"),
+        VOICE_EAT = sound("eat"), VOICE_HURT = sound("hurt"), VOICE_DEATH = sound("death");
+
+    private static net.minecraft.sounds.SoundEvent sound(String name) {
+        var key=id("entity.big_fat_fish."+name);
+        return Registry.register(BuiltInRegistries.SOUND_EVENT,key,net.minecraft.sounds.SoundEvent.createVariableRangeEvent(key));
+    }
 
     public static final RiceBlock RICE_CROP = Registry.register(BuiltInRegistries.BLOCK, id("rice_crop"),
         new RiceBlock(BlockBehaviour.Properties.of().setId(ResourceKey.create(Registries.BLOCK, id("rice_crop")))

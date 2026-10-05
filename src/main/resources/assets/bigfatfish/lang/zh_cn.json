@@ -481,5 +481,10 @@
   "skin.bigfatfish.summer": "白蓝夏日",
   "screen.bigfatfish.skin": "外观 · 点击切换",
   "screen.bigfatfish.juvenile": "幼年 · 米饭帮助长大",
-  "screen.bigfatfish.adult": "成年 · 可以帮忙干活"
+  "screen.bigfatfish.adult": "成年 · 可以帮忙干活",
+  "subtitles.bigfatfish.idle": "大肥鱼：轻哼",
+  "subtitles.bigfatfish.beg": "大肥鱼：讨饭",
+  "subtitles.bigfatfish.eat": "大肥鱼：享用米饭",
+  "subtitles.bigfatfish.hurt": "大肥鱼：受伤",
+  "subtitles.bigfatfish.death": "大肥鱼：倒下"
 }

@@ -72,6 +72,24 @@ public final class FishMotionCheck {
         }
         require(hairRebound,"Hair did not rebound after turning stopped");
         require(Math.abs(turning.hairYaw.sample(1))<1e-7,"Hair did not settle after rebound");
+        FishMotion idle=new FishMotion(123),idleOther=new FishMotion(456),repeated=new FishMotion(123);
+        boolean left=false,right=false,different=false;
+        for(int tick=0;tick<2000;tick++) {
+            idle.update(tick,0,0,0,0,false,false);
+            idleOther.update(tick,0,0,0,0,false,false);
+            for(int frame=0;frame<8;frame++) repeated.update(tick,0,0,0,0,false,false);
+            float value=idle.tailIdle.sample(1);
+            left|=value<-.1F;right|=value>.1F;
+            different|=Math.abs(value-idleOther.tailIdle.sample(1))>.1F;
+            require(value==repeated.tailIdle.sample(1),"Rendering frames advance random tail motion");
+            require(Math.abs(value)<=.320001F,"Random tail leaves its safe range");
+        }
+        require(left && right && different,"Idle tail must sway in both directions independently per entity");
+        require(walking.clothPitch.sample(1)>.1F,"Walking must move the skirt hem");
+        for(int tick=31;tick<=250;tick++) walking.update(tick,0,0,30*.22,0,false,false);
+        require(Math.abs(walking.clothPitch.sample(1))<1e-7,"Cloth must settle after walking stops");
+        idle.update(2000,80,0,0,0,false,false);
+        require(idle.tailIdle.sample(1)==0 && idle.clothPitch.sample(1)==0,"Teleport must reset tail and cloth");
         System.out.println("FishMotion checks passed: bounded/settling springs, elastic return, frame-independent extraction, entity isolation, teleport/age/gap reset, wrapped yaw.");
     }
 }

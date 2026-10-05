@@ -5,10 +5,25 @@ final class FishMotion {
     final Spring hairPitch = new Spring(.14F, .80F, -.12F, .26F);
     final Spring hairYaw = new Spring(.14F, .80F, -.28F, .28F);
     final Spring tailYaw = new Spring(.10F, .82F, -.14F, .14F);
+    final Spring tailIdle = new Spring(.035F, .86F, -.32F, .32F);
+    final Spring clothPitch = new Spring(.20F, .72F, -.16F, .30F);
+    final Spring clothSway = new Spring(.18F, .74F, -.22F, .22F);
+    private final long seed;
     private boolean initialized, juvenile;
     private int lastTick;
     private double lastX, lastY, lastZ, lastVx, lastVz;
     private float lastYaw;
+
+    FishMotion() { this(0); }
+    FishMotion(long seed) { this.seed=seed; }
+
+    private float tailTarget(int tick) {
+        long bits=seed+Math.floorDiv(tick,73)*0x9e3779b97f4a7c15L;
+        bits=(bits^(bits>>>30))*0xbf58476d1ce4e5b9L;
+        bits=(bits^(bits>>>27))*0x94d049bb133111ebL;
+        bits^=bits>>>31;
+        return ((bits>>>40)/(float)(1L<<24)-.5F)*.56F;
+    }
 
     void update(int tick, double x, double y, double z, float yaw, boolean baby, boolean sitting) {
         double dx=x-lastX, dy=y-lastY, dz=z-lastZ;
@@ -16,6 +31,7 @@ final class FishMotion {
         if (!initialized || baby!=juvenile || elapsed<0 || elapsed>4 || dx*dx+dy*dy+dz*dz>4) {
             initialized=true; juvenile=baby;
             hairPitch.reset(); hairYaw.reset(); tailYaw.reset();
+            tailIdle.reset(); clothPitch.reset(); clothSway.reset();
             lastVx=lastVz=0;
         } else {
             if (elapsed==0) return;
@@ -31,6 +47,9 @@ final class FishMotion {
                 hairPitch.step((forward*.65F+acceleration*1.4F)*amount);
                 hairYaw.step((-turn*1.8F-sideways*.7F)*amount);
                 tailYaw.step((-turn*.9F-sideways*.35F)*amount);
+                tailIdle.step(tailTarget(lastTick+i+1)*(sitting?.65F:1F));
+                clothPitch.step((forward*.8F+acceleration*1.2F+(float)(dy/elapsed)*.35F)*amount);
+                clothSway.step((-turn*.9F-sideways*.8F)*amount);
             }
             lastVx=vx; lastVz=vz;
         }

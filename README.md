@@ -1,5 +1,9 @@
 # 大肥鱼 · Fabric 26.3
 
+**1.4.0** 女仆装接入授权 MMD 模型；夏日装沿用同一套脸、长发、身体和表情，换成白蓝上衣、百褶裙及运动鞋。两种装扮均支持成年、幼年、持物与动作。新增 9 段合成角色语音，覆盖轻哼、讨饭、吃饭、受伤和倒下，并提供字幕。水稻改为细茎、分层叶片和下垂稻穗的立体模型，生长、生成和收割规则保持一致。
+
+游戏截图：[MMD 女仆装](docs/screenshots/maid.png) · [MMD 夏日装](docs/screenshots/summer.png) · [水稻生长阶段](docs/screenshots/rice.png)
+
 **1.3.2** 水稻接入普通河流生物群系的原版植被地物生成，使用世界生成提供的随机数决定位置与初始生长阶段。相同种子、版本及生成配置下可复现，不受世界运行时随机数消耗影响；仅影响尚未生成的区块，保留已有水稻。
 
 **1.3.1** 修复河边水稻生成时同步等待尚未完成的区块、导致服务器停滞的问题；生物搜索跳过未加载区块。校准成年和幼年碰撞箱与眼高，封闭头顶接缝，长发采用发根固定、发梢渐进弯曲的惯性回弹。
@@ -14,7 +18,7 @@
 - 正好感度预写对白分为 0–24、25–49、50–74、75–99、100 五档；负好感度还有 −1 至 −24、−25 至 −49、−50 至 −74、−75 至 −100 四档，语气逐渐疏远。仍只对主人发言。到 −100 时说出一句告别并立即消失，背包和双手装备掉落在原地。
 - 客户端测试在关闭服务器后删除本次测试创建的世界目录；保留截图、日志和报告。清理仅针对测试 API 返回的单个存档路径，并检查其位于测试 `saves` 目录内。
 
-添加参考图风格的蓝发鲸鱼女孩“大肥鱼”，以及水稻、稻谷、稻米、米饭和石磨。角色保留蓝色渐变长发、呆毛、鳍耳、双瓣鲸尾、女仆发箍与鲸鱼围裙等特征；使用独立成年、幼年比例，以及睁眼和闭眼表情。每套完整模型含 1482 个面，角色贴图为 128×128 像素。
+添加参考图风格的蓝发鲸鱼女孩“大肥鱼”，以及水稻、稻谷、稻米、米饭和石磨。角色保留原 MMD 的蓝色渐变长发、呆毛、鳍耳、双瓣鲸尾、女仆发箍与鲸鱼围裙等特征。幼年按身高缩放；眨眼、微笑使用原模型的表情形变。服装与身体使用顶点权重跟随骨骼，头发、尾巴和裙摆增加弹簧缓动。
 
 提供“鲸尾女仆”和“白蓝夏日”两套外观，幼年和成年均可换装。野生生成时等概率随机选择；主人潜行右键打开背包后，可在右侧实时预览并点击按钮换肤。当前皮肤的按钮置灰。选择会同步给其他玩家并保存，旧存档默认使用女仆装。换肤保留背包、装备及工作状态。
 
@@ -111,19 +115,24 @@ python tools/check_pixel_import.py        # 像素模型导入、硬边法线、
 
 服务端测试报告位于 `build/gametest-results.xml`；客户端测试截图位于 `build/clienttest/screenshots/`。32 项模组服务端测试覆盖水稻、工作范围、权限、装备与存档、饥饿、幼年尺寸及成长、纯幼年自然生成、好感度与饱食拒食、长期未喂衰减、负好感跑路与物品掉落、−100 后立即喂饭不能取消跑路且不会重复掉落、繁育条件与冷却、命名牌以及对白阶段。另有 1 项 Fabric 基础测试。客户端测试检查四套外观、年龄同步、真实换肤和繁育按钮、拒绝发言、跑路消息和实体移除、冷却及名字同步、动作、角色画面像素与完整三视图；世界关闭后自动删除。
 
-角色采用块状低模与 128×128 像素贴图，以 Blockbench 中维护的 [成年完整模型](models/bigfatfish_pixel.bbmodel) 和 [幼年完整模型](models/bigfatfish_pixel_juvenile.bbmodel) 为权威源。两个项目均包含女仆装、夏装和动画骨骼。先在编辑器完成几何、UV、骨骼和外观检查，保存正常站姿，再导回运行时压缩网格；`--pixel` 保留硬边和编辑器 UV，不套用旧曲面模型的平滑处理：
+1.4.0 的可见角色使用 `mmd.mesh.json.gz` 与 `mmd_summer.mesh.json.gz`。女仆装保留原 PMX 几何、贴图、四权重蒙皮和选定表情；夏日装在此基础上更换服装。导入时修正坐标系与三角形朝向，避免单面眼睛和皮肤被错误剔除。
 
 ```powershell
-python tools/import_blockbench.py models/bigfatfish_pixel.bbmodel --pixel --check
-python tools/import_blockbench.py models/bigfatfish_pixel_juvenile.bbmodel --pixel --juvenile --check
-python tools/import_blockbench.py models/bigfatfish_pixel.bbmodel --pixel
-python tools/import_blockbench.py models/bigfatfish_pixel_juvenile.bbmodel --pixel --juvenile
+python tools/convert_mmd.py "build/mmd_source/蓝色大肥鱼1.12.pmx"
+python tools/mmd_summer.py
+python tools/check_mmd.py
+python tools/generate_rice_models.py
+python tools/check_rice_voice.py
 ```
 
-`--full` 是默认行为。根节点原点必须保持 `[0,24,0]`；导回要求将非零组/网格旋转或缩放应用到顶点，不要保存临时动作预览为模型源。通过本地 Blockbench MCP 打开完整项目后，可运行 `python tools/blockbench_pose.py sitting` 或 `python tools/blockbench_pose.py clasp` 临时预览坐姿和抱手动作。脚本在 `build/` 保存截图，并在结束时恢复网格、骨骼原点和旋转；这是姿态变形预览，不包含物理碰撞或游戏 AI。全部编辑完成后再进行最终客户端验收。
+原始 ZIP 不随仓库提交；运行第一条命令需要自行提供获授权的源文件及同目录贴图。正常编译直接使用已提交的转换资源，不需要 PMX 或额外模型依赖。两条转换命令分别生成 `build/bigfatfish_mmd.bbmodel` 与 `build/bigfatfish_mmd_summer.bbmodel`，用于 Blockbench 几何和材质检查；预览文件不保留运行时顶点权重，不能反向覆盖蒙皮数据。
 
-`tools/generate_character.py` 保留程序化初始模型和几何检查函数；只要完整 BB 源存在，直接运行就会拒绝覆盖运行时资源。`python tools/generate_character.py --procedural` 会明确用程序化几何替换资源，不能用于保存 Blockbench 编辑成果。
+`MmdMesh.java` 使用原版 `submitCustomGeometry` 接口提交蒙皮后的网格，无第三方模型运行库。游戏动作驱动原 MMD 骨骼，头发、尾巴与裙摆使用移动惯性缓动；这是游戏内动画适配，不是完整 MMD/VMD 播放器，也不包含 PMX 刚体物理模拟。夏日裙摆增加坐姿调整。旧像素 BB 工程仍保留供历史编辑参考，其骨架继续提供动作参数，可见模型已切换为 MMD。
 
-`CharacterMesh.java` 使用原版 `submitCustomGeometry` 接口提交网格，`FishModel.java` 控制骨骼和动作，无第三方模型运行库。头发与尾巴会随移动、转向产生弹簧缓动；关节使用连续弯曲，鞋子保持刚性。客户端测试额外检查四套外观截图中的实际角色像素，防止模型消失但实体同步仍正常时误报成功。可将 Sodium 和 Iris 的对应版本 JAR 放入隔离测试目录 `build/clienttest/mods` 后运行客户端测试。其余物品和作物资源、对白通过 `python tools/generate_assets.py` 生成。
+客户端测试检查模型可见性、成年/幼年换肤、表情与动作、五类音效从服务端到客户端音效引擎的传递，以及水稻各阶段截图。可将 Sodium 和 Iris 的对应版本 JAR 放入隔离测试目录 `build/clienttest/mods` 后运行客户端测试。CI 检查蒙皮、虹膜面朝向、夏日装与原角色几何一致性、水稻模型、语音资源与字幕，再编译并运行服务端测试。
 
-Blockbench 项目内嵌材质图集和睁眼脸部贴图；导回网格不会自动覆盖 PNG。修改贴图时，将图集导出到 `character_atlas.png`，脸部导出到 `adult_face.png` 与 `face.png`，并同步相同 UV 布局的两个 `_closed.png`。五张角色贴图均关闭模糊过滤，保留清楚的像素边缘。当前像素贴图在 Blockbench 中绘制，构建不会重新生成它们。
+语音使用通用合成女声 `zh-CN-XiaoyiNeural`，不仿冒原角色声优。`tools/generate_voice.py` 记录短句、语速及音高设置；OGG 为 24 kHz 单声道，使用原版生物音量分类和距离衰减。讨饭语音受聊天冷却限制，吃饭语音只在实际消耗米饭时播放。生成脚本需要独立安装 `edge-tts`、`imageio-ffmpeg`、`soundfile`；普通构建和游戏运行不需要这些工具。
+
+## 模型署名
+
+模型制作：**水原镜**；MMD 转换绑定：**耶栗Yaki**。本项目 Minecraft 适配与公开分发依据用户确认取得的额外授权。随包原始规约完整保留在 [MMD-SOURCE-LICENSE.txt](src/main/resources/assets/bigfatfish/models/entity/MMD-SOURCE-LICENSE.txt)，署名及授权说明见 [MMD-CREDITS.txt](src/main/resources/assets/bigfatfish/models/entity/MMD-CREDITS.txt)。

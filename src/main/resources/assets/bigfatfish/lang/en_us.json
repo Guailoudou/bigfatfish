@@ -481,5 +481,10 @@
   "skin.bigfatfish.summer": "Summer Blue",
   "screen.bigfatfish.skin": "Skin: select below",
   "screen.bigfatfish.juvenile": "Young: feed rice",
-  "screen.bigfatfish.adult": "Adult: can help"
+  "screen.bigfatfish.adult": "Adult: can help",
+  "subtitles.bigfatfish.idle": "Big Fat Fish hums",
+  "subtitles.bigfatfish.beg": "Big Fat Fish asks for rice",
+  "subtitles.bigfatfish.eat": "Big Fat Fish enjoys rice",
+  "subtitles.bigfatfish.hurt": "Big Fat Fish hurts",
+  "subtitles.bigfatfish.death": "Big Fat Fish dies"
 }

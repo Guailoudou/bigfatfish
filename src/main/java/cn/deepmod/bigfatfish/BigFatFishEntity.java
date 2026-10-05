@@ -121,6 +121,11 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
     @Override public boolean isFood(ItemStack stack) { return stack.is(BigFatFishMod.COOKED_RICE); }
+    @Override protected net.minecraft.sounds.SoundEvent getAmbientSound() { return BigFatFishMod.VOICE_IDLE; }
+    @Override protected net.minecraft.sounds.SoundEvent getHurtSound(net.minecraft.world.damagesource.DamageSource source) { return BigFatFishMod.VOICE_HURT; }
+    @Override protected net.minecraft.sounds.SoundEvent getDeathSound() { return BigFatFishMod.VOICE_DEATH; }
+    @Override public int getAmbientSoundInterval() { return 400; }
+    @Override protected float getSoundVolume() { return .65F; }
     @Override public AgeableMob getBreedOffspring(ServerLevel l, AgeableMob other) { return null; }
     @Override public boolean canFallInLove() { return false; }
     @Override public boolean removeWhenFarAway(double distance) { return false; }
@@ -189,6 +194,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
                     entityData.set(HUNGER, Math.min(20, hunger() + 8)); heal(4);
                     entityData.set(SATIETY,SATIETY_TICKS);unfedTicks=0;
                     emote(4);
+                    playSound(BigFatFishMod.VOICE_EAT,.65F,1);
                     if (isBaby()) ageUp(AgeableMob.getSpeedUpSecondsWhenFeeding(-getAge()), true);
                     if (!isTame()) {
                         // Same independent 1/3 roll as Minecraft 26.3 Cat.tryToTame; failed bowls do not accumulate a guarantee.
@@ -224,6 +230,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
     public void say(String event, boolean force) {
         if (!(getOwner() instanceof ServerPlayer owner) || (!force && chatCooldown > 0)) return;
         owner.sendSystemMessage(dialogue(event,random.nextInt(3)));
+        if(event.endsWith("hungry")) playSound(BigFatFishMod.VOICE_BEG,.65F,1);
         chatCooldown = event.endsWith("hungry") ? 600 : 200;
     }
     public Component dialogue(String event,int line) {

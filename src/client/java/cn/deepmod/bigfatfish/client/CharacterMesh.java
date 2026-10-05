@@ -154,6 +154,13 @@ final class CharacterMesh {
             hair=new FishHairBend(root,end-root,0,0);
         }
         String name=node.get("name").getAsString();
+        if(name.equals("maid_body") || name.equals("summer_body")) {
+            // Reuse the root-fixed bend for both skirts. Everything above the
+            // waist, including the bodice and brooch, stays attached to the torso.
+            float waist=(juvenile?1.85F:2.95F)/16F,hem=waist;
+            for(int i=1;i<vertices.length;i+=8) hem=Math.max(hem,vertices[i]);
+            hair=new FishHairBend(waist,hem-waist,0,0);
+        }
         return new Surface(result, vertices, hair,
             name.equals("forearm") || name.equals("shin") ? jointSpan(juvenile) : 0, name.equals("shoe"), List.copyOf(surfaces));
     }

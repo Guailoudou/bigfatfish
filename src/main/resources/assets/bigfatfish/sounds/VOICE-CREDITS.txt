@@ -1,0 +1,4 @@
+These short utterances were generated for Big Fat Fish with the generic
+Microsoft zh-CN-XiaoyiNeural synthetic voice (rate +8%, pitch +12Hz).
+They are not recordings of, or a voice clone of, the model's original creator.
+Generation script and original phrases: tools/generate_voice.py.

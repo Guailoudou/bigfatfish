@@ -1,0 +1,63 @@
+{
+  "entity.big_fat_fish.idle": {
+    "subtitle": "subtitles.bigfatfish.idle",
+    "sounds": [
+      {
+        "name": "bigfatfish:entity/big_fat_fish/idle_1",
+        "attenuation_distance": 12
+      },
+      {
+        "name": "bigfatfish:entity/big_fat_fish/idle_2",
+        "attenuation_distance": 12
+      }
+    ]
+  },
+  "entity.big_fat_fish.beg": {
+    "subtitle": "subtitles.bigfatfish.beg",
+    "sounds": [
+      {
+        "name": "bigfatfish:entity/big_fat_fish/beg_1",
+        "attenuation_distance": 12
+      },
+      {
+        "name": "bigfatfish:entity/big_fat_fish/beg_2",
+        "attenuation_distance": 12
+      }
+    ]
+  },
+  "entity.big_fat_fish.eat": {
+    "subtitle": "subtitles.bigfatfish.eat",
+    "sounds": [
+      {
+        "name": "bigfatfish:entity/big_fat_fish/eat_1",
+        "attenuation_distance": 12
+      },
+      {
+        "name": "bigfatfish:entity/big_fat_fish/eat_2",
+        "attenuation_distance": 12
+      }
+    ]
+  },
+  "entity.big_fat_fish.hurt": {
+    "subtitle": "subtitles.bigfatfish.hurt",
+    "sounds": [
+      {
+        "name": "bigfatfish:entity/big_fat_fish/hurt_1",
+        "attenuation_distance": 12
+      },
+      {
+        "name": "bigfatfish:entity/big_fat_fish/hurt_2",
+        "attenuation_distance": 12
+      }
+    ]
+  },
+  "entity.big_fat_fish.death": {
+    "subtitle": "subtitles.bigfatfish.death",
+    "sounds": [
+      {
+        "name": "bigfatfish:entity/big_fat_fish/death_1",
+        "attenuation_distance": 12
+      }
+    ]
+  }
+}

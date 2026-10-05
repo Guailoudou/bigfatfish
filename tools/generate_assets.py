@@ -63,6 +63,8 @@ def main():
             png(ASSETS / f'textures/block/{texture}.png',16,16,pix)
             js(ASSETS / f'models/block/{texture}.json',{'parent':'minecraft:block/cross','textures':{'cross':f'bigfatfish:block/{texture}'}})
     js(ASSETS / 'blockstates/rice_crop.json', {'variants':{f'age={a},part={p}':{'model':f'bigfatfish:block/rice_{a}_{p}'} for a in range(8) for p in range(3)}})
+    from generate_rice_models import generate
+    generate()
     faces={d:{'texture':'#stone'} for d in ['down','up','north','south','west','east']}
     wood={d:{'texture':'#wood'} for d in faces}
     js(ASSETS / 'models/block/stone_mill.json',{'textures':{'stone':'minecraft:block/stone','wood':'minecraft:block/oak_log','particle':'minecraft:block/stone'},'elements':[
@@ -219,6 +221,8 @@ def main():
     zh.pop('screen.bigfatfish.too_young',None)
     zh.update({'skin.bigfatfish.maid':'鲸尾女仆', 'skin.bigfatfish.summer':'白蓝夏日', 'screen.bigfatfish.skin':'外观 · 点击切换'})
     zh.update({'screen.bigfatfish.juvenile':'幼年 · 米饭帮助长大','screen.bigfatfish.adult':'成年 · 可以帮忙干活'})
+    zh.update(dict(zip(('subtitles.bigfatfish.'+event for event in ('idle','beg','eat','hurt','death')),
+        ('大肥鱼：轻哼','大肥鱼：讨饭','大肥鱼：享用米饭','大肥鱼：受伤','大肥鱼：倒下'))))
     js(ASSETS / 'lang/zh_cn.json',zh)
     en=dict(zh)
     en.update({'entity.bigfatfish.big_fat_fish':'Big Fat Fish','block.bigfatfish.rice_crop':'Rice Plant','block.bigfatfish.stone_mill':'Stone Mill','item.bigfatfish.paddy':'Paddy','item.bigfatfish.rice':'Rice Grain','item.bigfatfish.cooked_rice':'Bowl of Rice','item.bigfatfish.stone_mill':'Stone Mill','item.bigfatfish.big_fat_fish_spawn_egg':'Big Fat Fish Spawn Egg','screen.bigfatfish.backpack':'Backpack (27 slots)','screen.bigfatfish.mainhand':'Right (main)','screen.bigfatfish.offhand':'Left','screen.bigfatfish.hunger':'Food: %s/20'})
@@ -227,6 +231,8 @@ def main():
     en.update({'dialogue.bigfatfish.format':'<%s> %s','screen.bigfatfish.affection':'Affection: %s/100',
         'screen.bigfatfish.full':'Full','screen.bigfatfish.special':'Raise a little fish',
         'screen.bigfatfish.cooldown':'Cooldown: %s s','screen.bigfatfish.special_hint':'An adult with 100 affection can raise a little fish with its owner. Five-minute cooldown.'})
+    en.update(dict(zip(('subtitles.bigfatfish.'+event for event in ('idle','beg','eat','hurt','death')),
+        ('Big Fat Fish hums','Big Fat Fish asks for rice','Big Fat Fish enjoys rice','Big Fat Fish hurts','Big Fat Fish dies'))))
     js(ASSETS / 'lang/en_us.json',en)
 
 if __name__ == '__main__': main()

@@ -13,7 +13,17 @@ import net.minecraft.world.level.block.Blocks;
 public final class FishClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         assertJointSkinning();
+        context.runOnClient(mc->{
+            for(String event:java.util.List.of("idle","beg","eat","hurt","death")) {
+                var sound=mc.getSoundManager().getSoundEvent(BigFatFishMod.id("entity.big_fat_fish."+event));
+                if(sound==null || sound.getWeight()!=(event.equals("death")?1:2) || sound.getSubtitle()==null)
+                    throw new AssertionError("Missing voice samples or subtitle: "+event);
+            }
+        });
         var replies=new java.util.ArrayList<net.minecraft.network.chat.Component>();
+        var voices=java.util.concurrent.ConcurrentHashMap.<String>newKeySet();
+        net.minecraft.client.sounds.SoundEventListener voiceListener=(sound,event,distance)->voices.add(sound.getIdentifier().toString());
+        context.runOnClient(mc->mc.getSoundManager().addListener(voiceListener));
         context.runOnClient(mc->net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.GAME.register((message,overlay)->replies.add(message)));
         var world=context.worldBuilder().create();
         var save=world.getWorldSave().getSaveDirectory().toAbsolutePath().normalize();
@@ -47,6 +57,16 @@ public final class FishClientTest implements FabricClientGameTest {
                 return fish.getId();
             });
             context.waitTicks(160); // Let the tame advancement toast finish before visual captures.
+            world.getServer().runOnServer(server->{
+                var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);
+                for(var sound:java.util.List.of(BigFatFishMod.VOICE_IDLE,BigFatFishMod.VOICE_BEG,
+                        BigFatFishMod.VOICE_EAT,BigFatFishMod.VOICE_HURT,BigFatFishMod.VOICE_DEATH))
+                    fish.playSound(sound,.3F,1);
+            });
+            context.waitTicks(10);
+            for(String event:java.util.List.of("idle","beg","eat","hurt","death"))
+                if(!voices.contains("bigfatfish:entity.big_fat_fish."+event))
+                    throw new AssertionError("Server voice did not reach client sound engine: "+event);
             connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
             context.runOnClient(mc -> { mc.player.setYRot(180); mc.player.setXRot(4); });
             connection.waitForChunksRender();
@@ -63,6 +83,17 @@ public final class FishClientTest implements FabricClientGameTest {
                 var menu = ((FishScreen) mc.gui.screen()).getMenu();
                 if (menu.slots.size() != 65 || !menu.slots.get(0).getItem().is(BigFatFishMod.COOKED_RICE)
                     || !menu.slots.get(27).getItem().is(Items.IRON_HOE)) throw new AssertionError("Client slots must match server storage and hands");
+                var renderer=(FishRenderer)mc.getEntityRenderDispatcher().getRenderer(menu.fish());
+                renderer.getModel().setupAnim(renderer.createRenderState(menu.fish(),0));
+                var pose=renderer.getModel().mmdPose;
+                if(pose==null) throw new AssertionError("Maid skin must use the MMD mesh");
+                for(int i=0;i<pose.geometry().length;i+=6) {
+                    for(int k=0;k<6;k++) if(!Float.isFinite(pose.geometry()[i+k]))
+                        throw new AssertionError("Non-finite MMD skinned vertex");
+                    float nx=pose.geometry()[i+3],ny=pose.geometry()[i+4],nz=pose.geometry()[i+5];
+                    if(Math.abs(nx*nx+ny*ny+nz*nz-1)>.001F)
+                        throw new AssertionError("MMD skinning must preserve unit normals");
+                }
             });
             context.takeScreenshot("bigfatfish-backpack");
             context.clickScreenButton("skin.bigfatfish.summer");
@@ -75,6 +106,11 @@ public final class FishClientTest implements FabricClientGameTest {
             });
             context.runOnClient(mc -> {
                 if (((FishScreen)mc.gui.screen()).getMenu().fish().skin() != 1) throw new AssertionError("Skin must synchronize to client");
+                var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
+                var renderer=(FishRenderer)mc.getEntityRenderDispatcher().getRenderer(fish);
+                renderer.getModel().setupAnim(renderer.createRenderState(fish,0));
+                if(renderer.getModel().mmdPose==null || renderer.getModel().mmdPose.bones().length!=577)
+                    throw new AssertionError("Summer skin must use the MMD body and summer skirt bone");
             });
             context.takeScreenshot("bigfatfish-summer-backpack");
             context.setScreen(() -> null);
@@ -357,11 +393,26 @@ public final class FishClientTest implements FabricClientGameTest {
                     context.takeScreenshot("joint-elbow-"+(baby?"juvenile":"adult")+"-"+angle);
                 }
             }
+            world.getServer().runOnServer(server->{
+                var level=connection.getServerLevel();
+                int[] ages={0,2,4,6,7};
+                for(int i=0;i<ages.length;i++) {
+                    var root=new BlockPos(-6+i*3,-61,-4);
+                    level.setBlockAndUpdate(root.below(),Blocks.DIRT.defaultBlockState());
+                    level.setBlockAndUpdate(root,BigFatFishMod.RICE_CROP.defaultBlockState());
+                    BigFatFishMod.RICE_CROP.grow(level,root,level.getBlockState(root),ages[i]);
+                }
+                connection.getServerPlayer().teleportTo(.5,-58.5,8.5);
+            });
+            context.waitTicks(5);
+            context.runOnClient(mc->{mc.options.fov().set(70);mc.player.setYRot(180);mc.player.setXRot(17);});
+            connection.waitForChunksRender();context.takeScreenshot("rice-growth-stages");
             context.runOnClient(mc->{mc.options.fov().set(70);if(mc.gui.hud.isHidden()) mc.gui.hud.toggle();mc.getWindow().setWindowed(854,480);});
             world.getServer().runOnServer(server->((BigFatFishEntity)connection.getServerLevel().getEntity(entityId)).setAffection(-100));
             context.waitTicks(5);assertReply(context,replies,"runaway");
             context.runOnClient(mc->{if(mc.level.getEntity(entityId)!=null) throw new AssertionError("Runaway must remove the client entity");});
         } finally {
+            context.runOnClient(mc->mc.getSoundManager().removeListener(voiceListener));
             closeTestWorld(context,world,testServer);
         }
     }
@@ -401,6 +452,11 @@ public final class FishClientTest implements FabricClientGameTest {
         context.waitFor(mc->server.isStopped() && !net.fabricmc.fabric.impl.client.gametest.threading.ThreadingImpl.isServerRunning,
             net.minecraft.SharedConstants.TICKS_PER_MINUTE);
         if(context.computeOnClient(mc->mc.level!=null)) world.close();
+        // The server's disconnect packet can arrive before world.close(),
+        // leaving an already-unloaded level on DisconnectedScreen instead.
+        context.waitFor(mc->mc.level==null);
+        context.waitTicks(2);
+        context.setScreen(net.minecraft.client.gui.screens.TitleScreen::new);
     }
     private static void recordTestWorld(java.nio.file.Path save,java.nio.file.Path saves) {
         if(!save.getParent().equals(saves)) throw new AssertionError("Refusing to record a world outside the test saves directory: "+save);
@@ -495,8 +551,9 @@ public final class FishClientTest implements FabricClientGameTest {
             int hairPixels=0;
             for(int y=y0;y<y1;y++) for(int x=x0;x<x1;x++) {
                 int pixel=image.getRGB(x,y), r=(pixel>>16)&255, g=(pixel>>8)&255, b=pixel&255;
-                // Exclude the pale blue sky: a missing model must not pass on background pixels.
-                if(b>80 && g<160 && b>r*1.25 && b>g*1.08) hairPixels++;
+                // Include the MMD's navy hair, but exclude sky, grass and the
+                // preview panel (#152136, blue=54). An empty panel must fail.
+                if(b>60 && g<160 && b>r*1.25 && b>g*1.08) hairPixels++;
             }
             if(hairPixels<(x1-x0)*(y1-y0)/20) throw new AssertionError("Character is invisible in " + name);
         } catch(java.io.IOException e) { throw new AssertionError("Cannot inspect rendered character", e); }
