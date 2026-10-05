@@ -31,6 +31,13 @@ jobs:
       - name: Check pixel models and textures
         run: python3 tools/check_pixel_import.py
 
+      - name: Check hair motion
+        run: |
+          mkdir -p build/motion-check
+          javac -d build/motion-check src/client/java/cn/deepmod/bigfatfish/client/FishMotion.java src/client/java/cn/deepmod/bigfatfish/client/FishHairBend.java tools/FishMotionCheck.java tools/FishHairBendCheck.java
+          java -cp build/motion-check cn.deepmod.bigfatfish.client.FishMotionCheck
+          java -cp build/motion-check cn.deepmod.bigfatfish.client.FishHairBendCheck
+
       - name: Build and run server GameTests
         run: bash ./gradlew --no-daemon build runGametest
 

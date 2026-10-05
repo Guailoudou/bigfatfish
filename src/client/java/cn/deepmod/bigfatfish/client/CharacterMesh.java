@@ -56,7 +56,7 @@ final class CharacterMesh {
         // expressed in the final rigid frame, also used by held items.
         pose.translate(0,span*(sinc(angle)-1),-span*angle*cosc(angle));
     }
-    record Surface(ModelPart bone, float[] vertices, float[] hairWeights, float jointSpan, boolean rigid, List<Surface> children) {
+    record Surface(ModelPart bone, float[] vertices, FishHairBend hair, float jointSpan, boolean rigid, List<Surface> children) {
         void submit(PoseStack pose, SubmitNodeCollector collector, RenderType type, int light, int overlay, int color) {
             submit(pose,collector,type,light,overlay,color,null);
         }
@@ -70,31 +70,20 @@ final class CharacterMesh {
             JointBend localBend=jointSpan>0 ? new JointBend(bone.xRot,jointSpan,0,0)
                 : inheritedBend == null ? null : inheritedBend.offset(bone);
             JointBend bend=rigid && localBend!=null ? localBend.asRigid() : localBend;
-            if (hairWeights == null && bend == null) bone.translateAndRotate(pose);
+            if (hair == null && bend == null) bone.translateAndRotate(pose);
             else pose.translate(bone.x / 16F, bone.y / 16F, bone.z / 16F);
-            // Keep the crown attached while the free lengths follow their bone.
-            // Capture angles now: geometry submission is deferred between entities.
-            float cx=(float)Math.cos(bone.xRot), sx=(float)Math.sin(bone.xRot);
-            float cy=(float)Math.cos(bone.yRot), sy=(float)Math.sin(bone.yRot);
-            float cz=(float)Math.cos(bone.zRot), sz=(float)Math.sin(bone.zRot);
+            // Capture an immutable bend now: submission is deferred between entities.
+            FishHairBend hairBend=hair==null ? null
+                : new FishHairBend(hair.root(),hair.length(),bone.xRot,bone.yRot+bone.zRot);
             if (!bone.skipDraw && vertices.length > 0) collector.submitCustomGeometry(pose, type, (transform, buffer) -> {
-                float[] bent=bend == null ? null : new float[6];
+                float[] bent=bend == null && hairBend == null ? null : new float[6];
                 for (int i = 0; i < vertices.length; i += 8) {
                     float x=vertices[i], y=vertices[i+1], z=vertices[i+2];
                     float nx=vertices[i+5], ny=vertices[i+6], nz=vertices[i+7];
-                    if (hairWeights != null) {
-                        float w=hairWeights[i/8];
-                        float ry=y*cx-z*sx, rz=y*sx+z*cx;
-                        float rny=ny*cx-nz*sx, rnz=ny*sx+nz*cx;
-                        float yawX=x*cy+rz*sy, yawZ=rz*cy-x*sy;
-                        float yawNx=nx*cy+rnz*sy, yawNz=rnz*cy-nx*sy;
-                        float rx=yawX*cz-ry*sz, rnx=yawNx*cz-rny*sz;
-                        ry=yawX*sz+ry*cz; rny=yawNx*sz+rny*cz;
-                        rz=yawZ; rnz=yawNz;
-                        x+=(rx-x)*w; y+=(ry-y)*w; z+=(rz-z)*w;
-                        nx+=(rnx-nx)*w; ny+=(rny-ny)*w; nz+=(rnz-nz)*w;
-                        float length=(float)Math.sqrt(nx*nx+ny*ny+nz*nz);
-                        nx/=length; ny/=length; nz/=length;
+                    if (hairBend != null) {
+                        bent[0]=x;bent[1]=y;bent[2]=z;bent[3]=nx;bent[4]=ny;bent[5]=nz;
+                        hairBend.deform(bent);
+                        x=bent[0];y=bent[1];z=bent[2];nx=bent[3];ny=bent[4];nz=bent[5];
                     }
                     if (bend != null) {
                         bent[0]=x;bent[1]=y;bent[2]=z;bent[3]=nx;bent[4]=ny;bent[5]=nz;
@@ -155,16 +144,17 @@ final class CharacterMesh {
         var result = new ModelPart(List.of(), children); var pose = node.getAsJsonArray("pose");
         result.setInitialPose(PartPose.offset(pose.get(0).getAsFloat(),pose.get(1).getAsFloat(),pose.get(2).getAsFloat()));
         result.resetPose();
-        float[] hairWeights=null;
+        FishHairBend hair=null;
         if (node.get("name").getAsString().startsWith("hair_")) {
-            hairWeights=new float[vertices.length/8];
-            for (int i=0;i<hairWeights.length;i++) {
-                float t=Math.clamp((vertices[i*8+1]*16F-2F)/4F,0F,1F);
-                hairWeights[i]=t*t*(3F-2F*t);
-            }
+            // Freeze the complete head zone. Hair bones have a nonzero local
+            // origin, so use their actual pose instead of a fixed local weight.
+            float root=(.25F-result.y)/16F;
+            float end=root;
+            for(int i=1;i<vertices.length;i+=8) end=Math.max(end,vertices[i]);
+            hair=new FishHairBend(root,end-root,0,0);
         }
         String name=node.get("name").getAsString();
-        return new Surface(result, vertices, hairWeights,
+        return new Surface(result, vertices, hair,
             name.equals("forearm") || name.equals("shin") ? jointSpan(juvenile) : 0, name.equals("shoe"), List.copyOf(surfaces));
     }
 }

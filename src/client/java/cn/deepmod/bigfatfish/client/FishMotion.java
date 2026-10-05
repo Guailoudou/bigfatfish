@@ -2,8 +2,8 @@ package cn.deepmod.bigfatfish.client;
 
 /** Client-only secondary motion, advanced once per entity tick rather than per frame. */
 final class FishMotion {
-    final Spring hairPitch = new Spring(.18F, .78F, -.02F, .05F);
-    final Spring hairYaw = new Spring(.18F, .78F, -.035F, .035F);
+    final Spring hairPitch = new Spring(.14F, .80F, -.12F, .26F);
+    final Spring hairYaw = new Spring(.14F, .80F, -.28F, .28F);
     final Spring tailYaw = new Spring(.10F, .82F, -.14F, .14F);
     private boolean initialized, juvenile;
     private int lastTick;
@@ -28,8 +28,8 @@ final class FishMotion {
             float sideways=(float)(cos*ax+sin*az);
             float amount=sitting?.3F:1F;
             for (int i=0;i<elapsed;i++) {
-                hairPitch.step((forward*.06F+acceleration*.7F)*amount);
-                hairYaw.step(-turn*.65F*amount);
+                hairPitch.step((forward*.65F+acceleration*1.4F)*amount);
+                hairYaw.step((-turn*1.8F-sideways*.7F)*amount);
                 tailYaw.step((-turn*.9F-sideways*.35F)*amount);
             }
             lastVx=vx; lastVz=vz;

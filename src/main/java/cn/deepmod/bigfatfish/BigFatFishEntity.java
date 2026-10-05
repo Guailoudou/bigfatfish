@@ -25,6 +25,10 @@ import net.minecraft.world.level.storage.*;
 import net.minecraft.world.phys.Vec3;
 
 public final class BigFatFishEntity extends TamableAnimal implements ExtendedMenuProvider<Integer> {
+    // Calibrated to the pixel BB sources: crown ~20.5/14.2 px; pupil line ~15.55/10.10 px.
+    // Hair fins, tail and the small ahoge overhang do not enlarge the solid body box.
+    public static final float ADULT_WIDTH=.50F, ADULT_HEIGHT=1.30F, ADULT_EYE_HEIGHT=.973F;
+    public static final float JUVENILE_WIDTH=.40F, JUVENILE_HEIGHT=.90F, JUVENILE_EYE_HEIGHT=.632F;
     private static final EntityDataAccessor<Integer> HUNGER = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ACTIVITY = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SKIN = SynchedEntityData.defineId(BigFatFishEntity.class, EntityDataSerializers.INT);
@@ -54,9 +58,11 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
     public int emote() { return entityData.get(EMOTE); }
     public long emoteStart() { return entityData.get(EMOTE_START); }
     public void emote(int value) { entityData.set(EMOTE, value); entityData.set(EMOTE_START, level().getGameTime()); }
-    @Override public float getAgeScale() { return 1; } // The juvenile has its own proportions and one-block mesh.
+    @Override public float getAgeScale() { return 1; } // Both ages have independently sized meshes.
     @Override public EntityDimensions getDefaultDimensions(Pose pose) {
-        return isBaby() ? EntityDimensions.scalable(0.45F, 1).withEyeHeight(0.78F) : super.getDefaultDimensions(pose);
+        // AgeableMob refreshes dimensions on both sides when its baby flag changes.
+        return isBaby() ? EntityDimensions.scalable(JUVENILE_WIDTH, JUVENILE_HEIGHT).withEyeHeight(JUVENILE_EYE_HEIGHT)
+            : super.getDefaultDimensions(pose);
     }
     @Override public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason reason, SpawnGroupData group) {
         var result = super.finalizeSpawn(level, difficulty, reason, group);
@@ -122,9 +128,9 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         if (reason == EntitySpawnReason.SPAWN_ITEM_USE || reason == EntitySpawnReason.COMMAND) return true;
         if ((reason == EntitySpawnReason.NATURAL || reason == EntitySpawnReason.CHUNK_GENERATION) && random.nextInt(12) != 0) return false;
         BlockPos p = blockPosition();
-        if (!level.getBlockState(p.below()).isSolid() || !level.getFluidState(p).isEmpty() || level.getRawBrightness(p, 0) < 9) return false;
+        if (!level.hasChunk(p.getX() >> 4, p.getZ() >> 4) || !level.getBlockState(p.below()).isSolid() || !level.getFluidState(p).isEmpty() || level.getRawBrightness(p, 0) < 9) return false;
         for (BlockPos q : BlockPos.betweenClosed(p.offset(-5, -2, -5), p.offset(5, 0, 5)))
-            if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
+            if (level.hasChunk(q.getX() >> 4, q.getZ() >> 4) && level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
         return false;
     }
     @Override public void aiStep() {
@@ -272,6 +278,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         return state!=null && state.canSurvive(server,p);
     }
     private int seedSlot(ServerLevel server,BlockPos p,Block preferred) {
+        if(!server.hasChunkAt(p)) return -1;
         if(!server.getBlockState(p).isAir() && !server.getBlockState(p).is(Blocks.WATER)) return -1;
         if(server.getBlockState(p).isAir() && !server.getBlockState(p.below()).is(Blocks.FARMLAND)) return -1;
         // Same-crop seeds come first; the second pass accepts any legal crop.
@@ -312,7 +319,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
         @Override public void stop() { getNavigation().stop(); setInSittingPose(false); }
         private boolean allowed(Vec3 p) { return !isOrderedToSit() || workAnchor == null || p.distanceToSqr(Vec3.atBottomCenterOf(workAnchor)) <= 32 * 32; }
         private boolean move(Vec3 p, double speed) {
-            if (!allowed(p)) return false;
+            if (!allowed(p) || !level().hasChunkAt(BlockPos.containing(p))) return false;
             if (walkCooldown > 0) return true;
             walkCooldown = 20;
             var path = getNavigation().createPath(p.x, p.y, p.z, 1);
@@ -411,7 +418,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
                     if (blockedHarvest != null && !canStore(blockedHarvest)) { crop = null; rest(); return; }
                     blockedHarvest = null;
                     if (crop == null && scanCooldown == 0) { crop = findCrop(server); scanCooldown = 100; }
-                    if (crop != null && (mature(server.getBlockState(crop)) || seedSlot(server,crop,null)>=0)) {
+                    if (crop != null && server.hasChunkAt(crop) && (mature(server.getBlockState(crop)) || seedSlot(server,crop,null)>=0)) {
                         activity(HARVEST); setInSittingPose(false);
                         if (position().distanceToSqr(Vec3.atCenterOf(crop)) < 6.25) {
                             getNavigation().stop();
@@ -428,7 +435,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
                 rest(); return;
             }
             crop = null; loafTicks = 0;
-            if (bed != null && bedTicks-- > 0 && server.getBlockState(bed).is(BlockTags.BEDS) && owner != null && distanceToSqr(owner) < 100) {
+            if (bed != null && server.hasChunkAt(bed) && bedTicks-- > 0 && server.getBlockState(bed).is(BlockTags.BEDS) && owner != null && distanceToSqr(owner) < 100) {
                 activity(BED);
                 Vec3 bedTop = Vec3.atBottomCenterOf(bed).add(0, 1, 0);
                 double horizontalDistance = Math.pow(getX() - bedTop.x, 2) + Math.pow(getZ() - bedTop.z, 2);
@@ -440,6 +447,7 @@ public final class BigFatFishEntity extends TamableAnimal implements ExtendedMen
             bed = null;
             if (!hungry() && tickCount % 200 == 0 && random.nextInt(5) == 0 && owner != null && distanceToSqr(owner) < 64) {
                 for (BlockPos p : BlockPos.betweenClosed(blockPosition().offset(-6, -2, -6), blockPosition().offset(6, 2, 6))) {
+                    if (!server.hasChunkAt(p)) continue;
                     BlockState state = server.getBlockState(p);
                     if (state.is(BlockTags.BEDS) && !state.getValue(BedBlock.OCCUPIED) && server.getBlockState(p.above()).isAir()) {
                         bed = p.immutable(); bedTicks = 300 + random.nextInt(400); say("bed", false); break;

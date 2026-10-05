@@ -24,7 +24,7 @@ public final class RiceBlock extends Block implements BonemealableBlock {
     }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> b) { b.add(AGE, PART); }
     public static boolean soil(BlockState s) { return s.is(BlockTags.DIRT) || s.is(Blocks.FARMLAND) || s.is(BlockTags.SAND) || s.is(Blocks.GRAVEL); }
-    public static boolean canPlant(LevelReader level, BlockPos p) {
+    public static boolean canPlant(BlockGetter level, BlockPos p) {
         return level.getBlockState(p).is(Blocks.WATER) && level.getFluidState(p).isSource()
             && soil(level.getBlockState(p.below())) && level.getBlockState(p.above()).isAir() && level.getBlockState(p.above(2)).isAir();
     }

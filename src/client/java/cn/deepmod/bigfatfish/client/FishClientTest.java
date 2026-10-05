@@ -107,7 +107,10 @@ public final class FishClientTest implements FabricClientGameTest {
             connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
             context.runOnClient(mc -> {
                 var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
-                if(!fish.isBaby() || fish.getBbHeight()!=1) throw new AssertionError("Juvenile age and one-block dimensions synchronize");
+                if(!fish.isBaby() || Math.abs(fish.getBbHeight()-BigFatFishEntity.JUVENILE_HEIGHT)>.001
+                    || Math.abs(fish.getBbWidth()-BigFatFishEntity.JUVENILE_WIDTH)>.001
+                    || Math.abs(fish.getEyeHeight()-BigFatFishEntity.JUVENILE_EYE_HEIGHT)>.001)
+                    throw new AssertionError("Juvenile body dimensions and eye height synchronize");
             });
             assertVisible(context, "juvenile-maid-backpack", true);
             context.clickScreenButton("skin.bigfatfish.summer");connection.waitForServerboundPackets();context.waitTicks(5);
@@ -144,7 +147,10 @@ public final class FishClientTest implements FabricClientGameTest {
             context.waitTicks(5);connection.waitForClientboundEntityUpdates(BigFatFishMod.BIG_FAT_FISH);
             context.runOnClient(mc -> {
                 var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
-                if(fish.isBaby() || Math.abs(fish.getBbHeight()-1.8)>0.001) throw new AssertionError("Maturity synchronizes adult geometry and dimensions");
+                if(fish.isBaby() || Math.abs(fish.getBbHeight()-BigFatFishEntity.ADULT_HEIGHT)>.001
+                    || Math.abs(fish.getBbWidth()-BigFatFishEntity.ADULT_WIDTH)>.001
+                    || Math.abs(fish.getEyeHeight()-BigFatFishEntity.ADULT_EYE_HEIGHT)>.001)
+                    throw new AssertionError("Maturity synchronizes adult body dimensions and eye height");
             });
             context.takeScreenshot("adult-after-growth");context.setScreen(() -> null);
             world.getServer().runOnServer(server->{

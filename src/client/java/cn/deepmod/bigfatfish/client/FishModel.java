@@ -47,9 +47,9 @@ public final class FishModel extends HumanoidModel<FishRenderer.State> {
         tail.xRot=(float)Math.sin(time*0.045)*0.035F;
         for(int i=0;i<hair.size();i++) {
             float response=.75F+(i%5)*.05F;
-            hair.get(i).xRot=(float)Math.sin(time*0.055+i*0.32)*0.018F+state.hairPitch*response;
+            hair.get(i).xRot=(float)Math.sin(time*0.055+i*0.32)*0.025F+state.hairPitch*response;
             hair.get(i).yRot=state.hairYaw*response;
-            hair.get(i).zRot=(float)Math.sin(time*0.04+i*0.28)*0.018F;
+            hair.get(i).zRot=(float)Math.sin(time*0.04+i*0.28)*0.025F;
         }
         head.getChild("ahoge").zRot=(float)Math.sin(time*0.09)*0.09F;
         if(state.sitting) {

@@ -28,8 +28,8 @@ public final class FishMotionCheck {
             }
             float[] a=values(once,1),b=values(many,1);
             for(int i=0;i<3;i++) require(a[i]==b[i],"Repeated frame extraction advanced the spring");
-            require(Float.isFinite(a[0]) && a[0]>=-.020001F && a[0]<=.050001F,"Pitch unstable");
-            require(Float.isFinite(a[1]) && Math.abs(a[1])<=.035001F,"Hair yaw unstable");
+            require(Float.isFinite(a[0]) && a[0]>=-.120001F && a[0]<=.260001F,"Pitch unstable");
+            require(Float.isFinite(a[1]) && Math.abs(a[1])<=.280001F,"Hair yaw unstable");
             require(Float.isFinite(a[2]) && Math.abs(a[2])<=.140001F,"Tail yaw unstable");
         }
         zero(other,"Motion leaked between entities");
@@ -55,8 +55,23 @@ public final class FishMotionCheck {
         FishMotion wrap=new FishMotion();
         wrap.update(0,0,0,0,179,false,false);
         wrap.update(1,0,0,0,-179,false,false);
-        float expected=-(float)Math.toRadians(2)*.65F*.18F*.78F;
+        float expected=-(float)Math.toRadians(2)*1.8F*.14F*.80F;
         require(Math.abs(wrap.hairYaw.sample(1)-expected)<1e-7,"Yaw crossing 180 degrees produced a large impulse");
+        FishMotion walking=new FishMotion();
+        walking.update(0,0,0,0,0,false,false);
+        for(int i=1;i<=30;i++) walking.update(i,0,0,i*.22,0,false,false);
+        require(walking.hairPitch.sample(1)>.10F,"Walking hair motion is imperceptible");
+        FishMotion turning=new FishMotion();
+        turning.update(0,0,0,0,0,false,false);
+        for(int i=1;i<=8;i++) turning.update(i,0,0,0,i*15,false,false);
+        require(Math.abs(turning.hairYaw.sample(1))>.15F,"Turning hair motion is imperceptible");
+        boolean hairRebound=false;
+        for(int i=9;i<=250;i++) {
+            turning.update(i,0,0,0,120,false,false);
+            hairRebound|=turning.hairYaw.sample(1)>.005F;
+        }
+        require(hairRebound,"Hair did not rebound after turning stopped");
+        require(Math.abs(turning.hairYaw.sample(1))<1e-7,"Hair did not settle after rebound");
         System.out.println("FishMotion checks passed: bounded/settling springs, elastic return, frame-independent extraction, entity isolation, teleport/age/gap reset, wrapped yaw.");
     }
 }

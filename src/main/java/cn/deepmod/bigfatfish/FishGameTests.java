@@ -148,7 +148,7 @@ public final class FishGameTests {
     @GameTest public void juvenileSizeGrowthAndSave(GameTestHelper h) {
         var owner=h.makeMockServerPlayerInLevel();owner.setGameMode(GameType.SURVIVAL);
         var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,3,2,3);fish.tame(owner);fish.setBaby(true);fish.setSkin(1);
-        h.assertTrue(fish.getBbHeight()==1 && fish.isBaby(),"Juvenile collision height is exactly one block");
+        h.assertTrue(fish.isBaby(),"Fish starts juvenile");assertFishDimensions(h,fish,true);
         int before=fish.getAge();
         owner.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(BigFatFishMod.COOKED_RICE));
         fish.mobInteract(owner,InteractionHand.MAIN_HAND);
@@ -157,11 +157,23 @@ public final class FishGameTests {
         var output=TagValueOutput.createWithContext(ProblemReporter.DISCARDING,h.getLevel().registryAccess());fish.saveWithoutId(output);
         var loaded=BigFatFishMod.BIG_FAT_FISH.create(h.getLevel(),net.minecraft.world.entity.EntitySpawnReason.LOAD);
         loaded.load(TagValueInput.create(ProblemReporter.DISCARDING,h.getLevel().registryAccess(),output.buildResult()));
-        h.assertTrue(loaded.isBaby() && loaded.getAge()==fish.getAge() && loaded.skin()==1 && loaded.getBbHeight()==1,"Age, dimensions and skin survive reload");
+        h.assertTrue(loaded.isBaby() && loaded.getAge()==fish.getAge() && loaded.skin()==1,"Age and skin survive reload");
+        assertFishDimensions(h,loaded,true);
         fish.setAge(0);
-        h.assertTrue(!fish.isBaby() && Math.abs(fish.getBbHeight()-1.8)<0.001,"Maturity restores adult dimensions");
+        h.assertTrue(!fish.isBaby(),"Maturity restores adult state");assertFishDimensions(h,fish,false);
         fish.setAge(-5);
-        h.runAfterDelay(10,()->{h.assertTrue(!fish.isBaby() && fish.getBbHeight()>1.7,"Natural aging crosses the adult boundary");h.succeed();});
+        assertFishDimensions(h,fish,true);
+        h.runAfterDelay(10,()->{h.assertTrue(!fish.isBaby(),"Natural aging crosses the adult boundary");assertFishDimensions(h,fish,false);h.succeed();});
+    }
+    private static void assertFishDimensions(GameTestHelper h,BigFatFishEntity fish,boolean juvenile) {
+        float width=juvenile?BigFatFishEntity.JUVENILE_WIDTH:BigFatFishEntity.ADULT_WIDTH;
+        float height=juvenile?BigFatFishEntity.JUVENILE_HEIGHT:BigFatFishEntity.ADULT_HEIGHT;
+        float eyes=juvenile?BigFatFishEntity.JUVENILE_EYE_HEIGHT:BigFatFishEntity.ADULT_EYE_HEIGHT;
+        h.assertTrue(Math.abs(fish.getBbWidth()-width)<.0001 && Math.abs(fish.getBbHeight()-height)<.0001,
+            "Age-specific body dimensions match the pixel model");
+        h.assertTrue(Math.abs(fish.getEyeHeight()-eyes)<.0001,"Eye height follows the visible pupil line");
+        h.assertTrue(Math.abs(fish.getBoundingBox().getYsize()-height)<.0001
+            && Math.abs(fish.getBoundingBox().getXsize()-width)<.0001,"Live collision box refreshes after age/load changes");
     }
     @GameTest public void tamingIsIndependentCatProbability(GameTestHelper h) {
         var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);
@@ -459,6 +471,57 @@ public final class FishGameTests {
             h.assertTrue(fish.backpack.getItems().stream().anyMatch(s -> s.is(Items.WHEAT)), "Harvest goes into the backpack");
             h.assertTrue(fish.position().distanceToSqr(net.minecraft.world.phys.Vec3.atBottomCenterOf(fish.anchor())) <= 1024, "Worker stays in range");
         });
+    }
+    @GameTest public void riverRiceBeforeChunkPublication(GameTestHelper h) {
+        // Deliberately absent from ServerChunkCache: consulting ServerLevel
+        // while placing the crop would synchronously load the wrong chunk.
+        var position=new net.minecraft.world.level.ChunkPos(100000,100000);
+        var level=h.getLevel();
+        var chunk=new net.minecraft.world.level.chunk.LevelChunk(level,position);
+        var river=level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
+            .getOrThrow(net.minecraft.world.level.biome.Biomes.RIVER);
+        chunk.fillBiomesFromNoise((x,y,z)->river);
+        int flags=net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+            |net.minecraft.world.level.block.Block.UPDATE_SKIP_ON_PLACE;
+        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Fixture chunk starts unpublished");
+        for(int age=0;age<=7;age++) {
+            BlockPos root=new BlockPos(position.getMinBlockX()+1+age,64,position.getMinBlockZ()+1);
+            chunk.setBlockState(root.below(),Blocks.DIRT.defaultBlockState(),flags);
+            chunk.setBlockState(root,Blocks.WATER.defaultBlockState(),flags);
+            h.assertTrue(RiceBlock.canPlant(chunk,root),"Unpublished chunk supports rice planting");
+            RiverRice.plant(chunk,root,age);
+            int height=age==7 ? 3 : age>=4 ? 2 : 1;
+            for(int part=0;part<3;part++) {
+                var state=chunk.getBlockState(root.above(part));
+                h.assertTrue(part<height ? state.is(BigFatFishMod.RICE_CROP)
+                    && state.getValue(RiceBlock.AGE)==age && state.getValue(RiceBlock.PART)==part
+                    : state.isAir(),"Direct generation produces the correct crop height and stage");
+            }
+            h.assertTrue(chunk.getFluidState(root).isSource(),"Generated root preserves its water source");
+        }
+        // Populate alternating shallow-water and dry-bank strips in the same
+        // unpublished chunk, including its border. setBlockState updates the
+        // actual heightmaps used by the production generate callback.
+        for(int x=0;x<16;x++) for(int z=3;z<16;z++) {
+            BlockPos root=new BlockPos(position.getMinBlockX()+x,64,position.getMinBlockZ()+z);
+            chunk.setBlockState(root.below(),Blocks.DIRT.defaultBlockState(),flags);
+            chunk.setBlockState(root,(z%2==0 ? Blocks.DIRT : Blocks.WATER).defaultBlockState(),flags);
+        }
+        for(int attempt=0;attempt<32;attempt++) RiverRice.generate(level,chunk);
+        int generated=0;
+        for(int x=1;x<15;x++) for(int z=3;z<15;z++) {
+            BlockPos root=new BlockPos(position.getMinBlockX()+x,64,position.getMinBlockZ()+z);
+            if(chunk.getBlockState(root).is(BigFatFishMod.RICE_CROP)) generated++;
+        }
+        h.assertTrue(generated>0,"The real generation callback planted river rice before publication");
+        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Generation does not request publication or synchronous loading");
+        var fish=h.spawn(BigFatFishMod.BIG_FAT_FISH,3,2,3);fish.setNoAi(true);
+        fish.backpack.setItem(0,new ItemStack(BigFatFishMod.PADDY,3));
+        BlockPos far=new BlockPos(position.getMinBlockX()+1,64,position.getMinBlockZ()+3);
+        h.assertTrue(!fish.plantFromBackpack(level,far,BigFatFishMod.RICE_CROP),"Worker refuses planting in an unpublished chunk");
+        h.assertTrue(fish.backpack.getItem(0).getCount()==3,"Failed unloaded planting preserves seed inventory");
+        h.assertTrue(level.getChunkSource().getChunkNow(position.x(),position.z())==null,"Worker planting does not synchronously load the chunk");
+        h.succeed();
     }
     @GameTest public void millAndFood(GameTestHelper h) {
         BlockPos p = new BlockPos(3, 2, 3);

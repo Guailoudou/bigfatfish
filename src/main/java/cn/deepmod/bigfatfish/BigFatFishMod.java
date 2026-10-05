@@ -39,7 +39,8 @@ public final class BigFatFishMod implements ModInitializer {
     public static final Item COOKED_RICE = item("cooked_rice", p -> new Item(p.food(Foods.COOKED_BEEF).usingConvertsTo(Items.BOWL)));
     public static final Item STONE_MILL = item("stone_mill", p -> new BlockItem(MILL, p));
     public static final EntityType<BigFatFishEntity> BIG_FAT_FISH = Registry.register(BuiltInRegistries.ENTITY_TYPE, id("big_fat_fish"),
-        EntityType.Builder.of(BigFatFishEntity::new, MobCategory.CREATURE).sized(0.6F, 1.8F).eyeHeight(1.52F)
+        EntityType.Builder.of(BigFatFishEntity::new, MobCategory.CREATURE)
+            .sized(BigFatFishEntity.ADULT_WIDTH, BigFatFishEntity.ADULT_HEIGHT).eyeHeight(BigFatFishEntity.ADULT_EYE_HEIGHT)
             .clientTrackingRange(10).build(ResourceKey.create(Registries.ENTITY_TYPE, id("big_fat_fish"))));
     public static final Item SPAWN_EGG = item("big_fat_fish_spawn_egg", p -> new SpawnEggItem(p.spawnEgg(BIG_FAT_FISH)));
     public static final MenuType<FishMenu> FISH_MENU = Registry.register(BuiltInRegistries.MENU, id("fish_backpack"),
