@@ -49,7 +49,7 @@ print(f'MMD assets valid: {len(vertices)} weighted vertices, {len(indices)//3} t
 summer=json.loads(gzip.decompress((assets/'models/entity/mmd_summer.mesh.json.gz').read_bytes()))
 assert summer['vertices'][:len(vertices)]==vertices, 'Summer must preserve the original character geometry and skin weights'
 assert summer['morphs']==mesh['morphs'] and summer['bones'][:len(bones)]==bones
-assert summer['bones'][-1]['name']=='summer_skirt'
+assert [b['name'] for b in summer['bones'][len(bones):]]==['summer_skirt','summer_blouse']
 offset=0
 for material in summer['materials']:
     assert material['start']==offset
@@ -73,7 +73,11 @@ for side, upper, elbow in ((1,19,24),(-1,49,54)):
     for x in (1.6,2.0,2.4,2.8,3.2,3.6,4.0,4.4):
         section = [v for v in arm if abs(v[0]/scale-side*x)<.16]
         assert section and max(v[2] for v in section)-min(v[2] for v in section)>.4*scale, 'Missing arm cross-section'
-    assert all(v[8:10]==[upper,elbow] for v in arm)
+    assert any(v[8:10]==[upper,elbow] for v in arm)
+    material=next(m for m in summer['materials'] if m['name']=='summer_arm_completion_'+str(side))
+    original_skin=summer['materials'][9]
+    seam=set(summer['indices'][material['start']:material['start']+material['count']]) & set(summer['indices'][original_skin['start']:original_skin['start']+original_skin['count']])
+    assert len(seam)>=12, 'Arm must share actual source forearm vertices and skin weights'
     assert any(.2<v[13]<.8 for v in arm), 'Elbow requires blended weights'
     assert any(v[12]==1 for v in arm) and any(v[13]==1 for v in arm)
     assert any(v[10]==12 and .1<v[14]<.9 for v in arm), 'Shoulder must blend into the torso'
@@ -82,6 +86,11 @@ for height in (9.0,9.5,10.0):
     section = [v for v in body if abs((24-v[1])/scale-height)<.3]
     assert section and max(v[0] for v in section)-min(v[0] for v in section)>2*scale, 'Missing torso cross-section'
 top=next(m for m in summer['materials'] if m['name']=='summer_sleeveless_blouse')
+top_vertices=[summer['vertices'][i] for i in set(summer['indices'][top['start']:top['start']+top['count']])]
+collar=[v for v in top_vertices if (24-v[1])/scale>11.2]
+hem=[v for v in top_vertices if (24-v[1])/scale<9.05]
+assert collar and all(v[13]==0 for v in collar), 'Collar must remain anchored'
+assert hem and all(v[9]==len(bones)+1 and v[13]>.35 for v in hem), 'Free hem needs cloth weights'
 for start in range(top['start'],top['start']+top['count'],3):
     triangle=[summer['vertices'][i] for i in summer['indices'][start:start+3]]
     x,y,z=[sum(v[k] for v in triangle)/3/scale for k in range(3)]

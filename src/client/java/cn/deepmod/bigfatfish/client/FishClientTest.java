@@ -109,8 +109,9 @@ public final class FishClientTest implements FabricClientGameTest {
                 var fish=((FishScreen)mc.gui.screen()).getMenu().fish();
                 var renderer=(FishRenderer)mc.getEntityRenderDispatcher().getRenderer(fish);
                 renderer.getModel().setupAnim(renderer.createRenderState(fish,0));
-                if(renderer.getModel().mmdPose==null || renderer.getModel().mmdPose.bones().length!=577)
-                    throw new AssertionError("Summer skin must use the MMD body and summer skirt bone");
+                if(renderer.getModel().mmdPose==null || renderer.getModel().mmdPose.bones().length!=578)
+                    throw new AssertionError("Summer skin must use the MMD body and separate skirt/blouse bones");
+                assertSummerForearmOpacity();
             });
             context.takeScreenshot("bigfatfish-summer-backpack");
             context.setScreen(() -> null);
@@ -426,6 +427,30 @@ public final class FishClientTest implements FabricClientGameTest {
             context.runOnClient(mc->mc.getSoundManager().removeListener(voiceListener));
             closeTestWorld(context,world,testServer);
         }
+    }
+    private static void assertSummerForearmOpacity() {
+        try(var raw=FishClientTest.class.getResourceAsStream("/assets/bigfatfish/models/entity/mmd_summer.mesh.json.gz");
+            var reader=new java.io.InputStreamReader(new java.util.zip.GZIPInputStream(raw),java.nio.charset.StandardCharsets.UTF_8);
+            var png=FishClientTest.class.getResourceAsStream("/assets/bigfatfish/textures/entity/mmd/10.png")) {
+            var data=com.google.gson.JsonParser.parseReader(reader).getAsJsonObject();
+            var vertices=data.getAsJsonArray("vertices");var indices=data.getAsJsonArray("indices");
+            var image=javax.imageio.ImageIO.read(png);float scale=data.get("scale").getAsFloat();
+            int checked=0;
+            for(var entry:data.getAsJsonArray("materials")) {
+                var material=entry.getAsJsonObject();
+                if(!material.get("texture").getAsString().endsWith("/mmd/10.png")) continue;
+                int start=material.get("start").getAsInt(),end=start+material.get("count").getAsInt();
+                for(int i=start;i<end;i++) {
+                    var v=vertices.get(indices.get(i).getAsInt()).getAsJsonArray();
+                    float x=Math.abs(v.get(0).getAsFloat())/scale,y=(24-v.get(1).getAsFloat())/scale;
+                    if(x<3.9F || x>5.3F || y<7.8F || y>9) continue;
+                    int u=(int)(v.get(6).getAsFloat()*image.getWidth()),w=(int)(v.get(7).getAsFloat()*image.getHeight());
+                    if((image.getRGB(u,w)>>>24)<200) throw new AssertionError("Transparent summer forearm skin");
+                    checked++;
+                }
+            }
+            if(checked<100) throw new AssertionError("Summer forearm geometry is missing");
+        } catch(java.io.IOException e) {throw new AssertionError(e);}
     }
     private static void setPortraitRotation(ClientGameTestContext context,int entityId,int angle) {
         context.runOnClient(mc->{

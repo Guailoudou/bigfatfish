@@ -96,6 +96,8 @@ final class MmdMesh {
                         y=(state.tailIdle+state.tailYaw)*.18F;
                     } else if(name.equals("summer_skirt")) {
                         x=state.clothPitch;z=state.clothSway;
+                    } else if(name.equals("summer_blouse")) {
+                        x=state.clothPitch*.35F;z=state.clothSway*.3F;
                     } else if(name.startsWith("dress_")) {
                         x=state.clothPitch*.12F;z=state.clothSway*.12F;
                     }
