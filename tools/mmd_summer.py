@@ -1,7 +1,7 @@
 """Dress the original MMD character in the white/blue summer outfit.
 
-Original face, hair, skin, morphs and weights are preserved. Missing skin beneath
-the maid clothes is filled; garments use the existing summer atlas and helpers.
+Original face, hair, morphs and source vertices are preserved. Shoulder surfaces
+are replaced and missing skin is filled; garments reuse the summer atlas.
 """
 import base64
 import copy
@@ -27,7 +27,18 @@ def generate():
             continue
         material=copy.deepcopy(material)
         start=material['start'];material['start']=len(mesh['indices'])
-        mesh['indices'].extend(source['indices'][start:start+material['count']])
+        visible=source['indices'][start:start+material['count']]
+        if i==9:
+            # Replace the old sleeve-opening shoulder patches as well as the
+            # missing arm. Otherwise two independently weighted skin surfaces
+            # cross each other at the shoulder during raised-arm poses.
+            visible=[index for t in range(0,len(visible),3)
+                     if not all(abs(source['vertices'][v][0])/source['scale']>.75
+                                and 10<(24-source['vertices'][v][1])/source['scale']<11.5
+                                for v in visible[t:t+3])
+                     for index in visible[t:t+3]]
+        material['count']=len(visible)
+        mesh['indices'].extend(visible)
         mesh['materials'].append(material)
     scale=source['scale']
     skirt_bone=len(mesh['bones'])
@@ -52,6 +63,14 @@ def generate():
                 if skin:u,v=.904541015625,.001708984375
                 vertex=[x*scale,24+y*scale,z*scale,nx,ny,nz,u,v,
                     bone,second,-1,-1,1-amount,amount,0,0]
+                if elbow is not None:
+                    # Anchor the inner shoulder to the chest; blend into the
+                    # upper arm instead of rotating an entire cylinder root.
+                    shoulder=min(1,max(0,(abs(x)-1.15)/.95))
+                    shoulder=shoulder*shoulder*(3-2*shoulder)
+                    vertex[10]=12
+                    vertex[12]=(1-amount)*shoulder
+                    vertex[14]=(1-amount)*(1-shoulder)
                 key=tuple(vertex)
                 if key not in garment_vertices:
                     garment_vertices[key]=len(mesh['vertices']);mesh['vertices'].append(vertex)
@@ -75,7 +94,19 @@ def generate():
         add(arm,upper,skin=True,elbow=elbow)
 
     top=g.node('summer_sleeveless_blouse')
-    g.torso(top,[(-11.52,.5,.75),(-10.9,1.75,1.03),(-10.0,1.95,1.42),(-8.8,1.25,1.35)],g.PLAIN_WHITE)
+    # Front/back panels with actual armholes. A closed torso shell covers the
+    # shoulder joint and clips the upper arm whenever it rotates forward/up.
+    profiles=[(-11.52,.5,.75),(-10.9,1.65,1.03),(-10.0,1.80,1.42),(-8.8,1.25,1.35)]
+    for center in (0,math.pi):
+        rows=[]
+        for i in range(49):
+            y,rx,rz=g.catmull(profiles,i/48*(len(profiles)-1))
+            gap=.90*math.sqrt(max(0,1-((y+10.50)/.95)**2))
+            rows.append([(rx*math.sin(a),y,rz*math.cos(a))
+                         for a in [center-math.pi/2+gap+j/24*(math.pi-2*gap) for j in range(25)]])
+        for i in range(48):
+            for j in range(24):
+                g.quad(top,[rows[i][j],rows[i][j+1],rows[i+1][j+1],rows[i+1][j]],g.PLAIN_WHITE)
     for y,rx,rz in [(-11.54,.52,.77),(-8.82,1.28,1.38)]:
         g.tube(top,[(rx*math.sin(a*math.tau/48),y,rz*math.cos(a*math.tau/48)) for a in range(49)],
                [.045]*49,g.CYAN,48,6)
@@ -120,7 +151,7 @@ def generate():
     target=ASSETS/'models/entity/mmd_summer.mesh.json.gz'
     target.write_bytes(gzip.compress(json.dumps(mesh,separators=(',',':'),ensure_ascii=False).encode(),mtime=0))
     preview(mesh)
-    print(f'MMD summer: {len(mesh["vertices"])} vertices; original face, hair, body and morphs unchanged.')
+    print(f'MMD summer: {len(mesh["vertices"])} vertices; original face/hair/morphs, fitted body and summer garments.')
 
 
 def preview(mesh):

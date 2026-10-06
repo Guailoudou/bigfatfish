@@ -393,6 +393,17 @@ public final class FishClientTest implements FabricClientGameTest {
                     context.takeScreenshot("joint-elbow-"+(baby?"juvenile":"adult")+"-"+angle);
                 }
             }
+            for(int emote : new int[]{1,2,3,4,5}) {
+                world.getServer().runOnServer(server->{
+                    var fish=(BigFatFishEntity)connection.getServerLevel().getEntity(entityId);
+                    fish.setBaby(false);fish.setSkin(1);fish.setInSittingPose(false);fish.emote(emote);
+                    connection.getServerPlayer().teleportTo(fish.getX(),fish.getY()-.35,fish.getZ()+2.1);
+                });
+                context.waitTicks(30);
+                context.runOnClient(mc->{mc.player.setYRot(180);mc.player.setXRot(0);});
+                setPortraitRotation(context,entityId,315);
+                context.takeScreenshot("summer-arm-action-"+emote);
+            }
             world.getServer().runOnServer(server->{
                 var level=connection.getServerLevel();
                 int[] ages={0,2,4,6,7};

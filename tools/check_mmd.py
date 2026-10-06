@@ -76,8 +76,15 @@ for side, upper, elbow in ((1,19,24),(-1,49,54)):
     assert all(v[8:10]==[upper,elbow] for v in arm)
     assert any(.2<v[13]<.8 for v in arm), 'Elbow requires blended weights'
     assert any(v[12]==1 for v in arm) and any(v[13]==1 for v in arm)
+    assert any(v[10]==12 and .1<v[14]<.9 for v in arm), 'Shoulder must blend into the torso'
 body = completion('summer_body_completion')
 for height in (9.0,9.5,10.0):
     section = [v for v in body if abs((24-v[1])/scale-height)<.3]
     assert section and max(v[0] for v in section)-min(v[0] for v in section)>2*scale, 'Missing torso cross-section'
-print('Summer MMD preserves identity, fills missing torso/arms and blends elbow weights.')
+top=next(m for m in summer['materials'] if m['name']=='summer_sleeveless_blouse')
+for start in range(top['start'],top['start']+top['count'],3):
+    triangle=[summer['vertices'][i] for i in summer['indices'][start:start+3]]
+    x,y,z=[sum(v[k] for v in triangle)/3/scale for k in range(3)]
+    height=24/scale-y
+    assert not (10.2<height<10.8 and abs(x)>1.3 and abs(z)<.55), 'Blouse closes the shoulder armhole'
+print('Summer MMD preserves identity, fills torso/arms, blends joints and leaves shoulder armholes.')
