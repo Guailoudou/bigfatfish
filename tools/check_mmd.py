@@ -88,9 +88,12 @@ for height in (9.0,9.5,10.0):
 top=next(m for m in summer['materials'] if m['name']=='summer_sleeveless_blouse')
 top_vertices=[summer['vertices'][i] for i in set(summer['indices'][top['start']:top['start']+top['count']])]
 collar=[v for v in top_vertices if (24-v[1])/scale>11.2]
-hem=[v for v in top_vertices if (24-v[1])/scale<9.05]
+hem=[v for v in top_vertices if (24-v[1])/scale<9.85]
 assert collar and all(v[13]==0 for v in collar), 'Collar must remain anchored'
 assert hem and all(v[9]==len(bones)+1 and v[13]>.35 for v in hem), 'Free hem needs cloth weights'
+skirt=next(m for m in summer['materials'] if m['name']=='summer_pleated_skirt')
+skirt_vertices=[summer['vertices'][i] for i in set(summer['indices'][skirt['start']:skirt['start']+skirt['count']])]
+assert min((24-v[1])/scale for v in top_vertices)-max((24-v[1])/scale for v in skirt_vertices)>.65, 'Reference outfit must expose a visible waist between crop top and skirt'
 for start in range(top['start'],top['start']+top['count'],3):
     triangle=[summer['vertices'][i] for i in summer['indices'][start:start+3]]
     x,y,z=[sum(v[k] for v in triangle)/3/scale for k in range(3)]

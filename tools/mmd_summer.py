@@ -70,7 +70,7 @@ def generate():
                 if skirt:amount*=.5-.5*max(-1,min(1,z/2.15))
                 second=skirt_bone if skirt else -1
                 if blouse:
-                    amount=min(1,max(0,(y+10.4)/1.6))**2*.65
+                    amount=min(1,max(0,(y+10.8)/1.05))**2*.50
                     second=blouse_bone
                 if elbow is not None:
                     amount=min(1,max(0,(abs(x)-3.0)/.85))
@@ -160,8 +160,9 @@ def generate():
     top=g.node('summer_sleeveless_blouse')
     # Front/back panels with actual armholes. A closed torso shell covers the
     # shoulder joint and clips the upper arm whenever it rotates forward/up.
-    profiles=[(-11.52,.5,.75),(-10.9,1.59,1.04),(-10.1,1.72,1.31),
-              (-9.45,1.53,1.37),(-9.0,1.38,1.32)]
+    profiles=[(-11.52,.5,.75),(-10.9,1.59,1.04),(-10.3,1.73,1.31),
+              (-9.85,1.68,1.34)]
+    ruffles=g.node('summer_shoulder_ruffles')
     def cloth(t,a):
         y,rx,rz=g.catmull(profiles,t*(len(profiles)-1))
         # Small gathered folds build toward the free hem, not a spherical shell.
@@ -177,22 +178,29 @@ def generate():
                          for a in [center-math.pi/2+gap+j/24*(math.pi-2*gap) for j in range(25)]])
         for i in range(48):
             for j in range(24):
-                material=g.CYAN if center==math.pi and j in (5,18) else g.PLAIN_WHITE
+                midx=sum(p[0] for p in (rows[i][j],rows[i][j+1]))/2
+                # Straight blue fabric stripes, independent of armhole curvature.
+                material=g.CYAN if .62<abs(midx)<.84 else g.PLAIN_WHITE
                 g.quad(top,[rows[i][j],rows[i][j+1],rows[i+1][j+1],rows[i+1][j]],material)
         # Flat binding follows the armhole, giving the edge the thickness of cloth.
         for j in (0,24):
             edge=[row[j] for row in rows]
-            g.tube(top,edge,[.022]*len(edge),g.CYAN,48,6)
+            for i in range(6,37):
+                p,q=edge[i],edge[i+1]
+                def flounce(p,t):
+                    width=.14+.065*math.cos(t*.95)
+                    return (p[0]+math.copysign(width,p[0]),p[1]+.035*math.sin(t*.95),p[2]-.035)
+                g.quad(ruffles,[p,q,flounce(q,i+1),flounce(p,i)],g.PLAIN_WHITE)
     for y,rx,rz in [(-11.54,.52,.77)]:
         g.tube(top,[(rx*math.sin(a*math.tau/48),y,rz*math.cos(a*math.tau/48)) for a in range(49)],
-               [.045]*49,g.CYAN,48,6)
+                [.025]*49,g.CYAN,48,6)
     for side in (-1,1):
-        points=[(side*.12,-11.49,-.80),(side*.60,-11.34,-.95),
-                (side*.67,-10.98,-1.13),(side*.16,-11.15,-1.10)]
+        points=[(side*.10,-11.50,-.81),(side*.62,-11.34,-.98),
+                (side*.53,-10.92,-1.15),(side*.14,-11.13,-1.14)]
         if side<0:points.reverse()
         g.quad(top,points,g.PLAIN_WHITE)
     # Sewn button placket follows the front surface; no floating buttons.
-    for i in range(8,32):
+    for i in range(8,30):
         p=cloth(i/48,math.pi);q=cloth((i+1)/48,math.pi)
         g.quad(top,[(-.10,p[1],p[2]-.028),(.10,p[1],p[2]-.028),
                     (.10,q[1],q[2]-.028),(-.10,q[1],q[2]-.028)],g.CYAN)
@@ -203,17 +211,24 @@ def generate():
     for j in range(80):
         a=j*math.tau/80;b=(j+1)*math.tau/80
         p=cloth(1,a);q=cloth(1,b)
-        def hem(p,a):return (p[0]*1.025,p[1]+.13+.025*math.cos(9*a),p[2]*1.025)
+        def hem(p,a):return (p[0]*1.018,p[1]+.07+.018*math.cos(9*a),p[2]*1.018)
         g.quad(top,[p,q,hem(q,b),hem(p,a)],g.PLAIN_WHITE)
     g.emblem(top,(.72,-10.25,-1.22),.19)
     add(top,12,blouse=True)
+    add(ruffles,12,blouse=True)
 
     skirt=g.node('summer_pleated_skirt')
     g.skirt(skirt,-8.65,-5.0,3.05,2.15,(g.PLAIN_WHITE,g.PLAIN_WHITE,g.CYAN,g.PLAIN_WHITE),
             pleats=16,flare_start=.46,hem_wave=.045)
     g.torso(skirt,[(-8.84,1.4,1.38),(-8.53,1.46,1.4)],g.PLAIN_WHITE)
-    for side in (-1,1):
-        g.bow(skirt,(side*1.2,-8.50,-1.0),.29,g.SUMMER_BOW)
+    # Reference skirt has a side ring and hanging ribbon, not two maid bows.
+    ring=(-1.22,-8.55,-1.15)
+    for radius,width,material in ((.25,.055,g.CYAN),(.18,.028,g.PLAIN_WHITE)):
+        g.tube(skirt,[(ring[0]+radius*math.cos(a*math.tau/32),ring[1]+radius*math.sin(a*math.tau/32),ring[2]-.09)
+                      for a in range(33)],[width]*33,material,32,8)
+    for offset in (-.12,.15):
+        g.quad(skirt,[(-1.30+offset,-8.38,-1.27),(-1.05+offset,-8.38,-1.27),
+                      (-1.42+offset,-5.75,-2.0),(-1.75+offset,-5.95,-1.99)],g.CYAN if offset<0 else g.PLAIN_WHITE)
     add(skirt,13,skirt=True)
 
     for side,bone in ((-1,88),(1,92)):
