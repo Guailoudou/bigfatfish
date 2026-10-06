@@ -61,4 +61,23 @@ for vertex in summer['vertices'][len(vertices):]:
     assert len(vertex)==16 and all(map(math.isfinite,vertex))
     assert abs(sum(vertex[12:])-1)<1e-5
     assert all(w>=0 and (w==0 or 0<=b<len(summer['bones'])) for b,w in zip(vertex[8:12],vertex[12:]))
-print('Summer MMD preserves original identity and adds weighted summer garments.')
+# Source skin deliberately has holes beneath the maid sleeves and bodice.
+# Check rendered skin coverage inside those holes, not unused source vertices.
+scale = summer['scale']
+def completion(name):
+    material = next(m for m in summer['materials'] if m['name'] == name)
+    assert material['texture'].endswith('/mmd/10.png')
+    return [summer['vertices'][i] for i in set(summer['indices'][material['start']:material['start']+material['count']])]
+for side, upper, elbow in ((1,19,24),(-1,49,54)):
+    arm = completion('summer_arm_completion_'+str(side))
+    for x in (1.6,2.0,2.4,2.8,3.2,3.6,4.0,4.4):
+        section = [v for v in arm if abs(v[0]/scale-side*x)<.16]
+        assert section and max(v[2] for v in section)-min(v[2] for v in section)>.4*scale, 'Missing arm cross-section'
+    assert all(v[8:10]==[upper,elbow] for v in arm)
+    assert any(.2<v[13]<.8 for v in arm), 'Elbow requires blended weights'
+    assert any(v[12]==1 for v in arm) and any(v[13]==1 for v in arm)
+body = completion('summer_body_completion')
+for height in (9.0,9.5,10.0):
+    section = [v for v in body if abs((24-v[1])/scale-height)<.3]
+    assert section and max(v[0] for v in section)-min(v[0] for v in section)>2*scale, 'Missing torso cross-section'
+print('Summer MMD preserves identity, fills missing torso/arms and blends elbow weights.')

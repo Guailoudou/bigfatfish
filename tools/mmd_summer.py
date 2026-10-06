@@ -1,7 +1,7 @@
 """Dress the original MMD character in the white/blue summer outfit.
 
-Face, hair, body, morphs and their weights are copied unchanged. Garments use
-the existing summer atlas and geometry helpers, fitted to the PMX body.
+Original face, hair, skin, morphs and weights are preserved. Missing skin beneath
+the maid clothes is filled; garments use the existing summer atlas and helpers.
 """
 import base64
 import copy
@@ -34,7 +34,7 @@ def generate():
     mesh['bones'].append(dict(name='summer_skirt',parent=13,position=[0,24-8.65*scale,0]))
     garment_vertices={}
 
-    def add(part,bone,skirt=False):
+    def add(part,bone,skirt=False,skin=False,elbow=None):
         start=len(mesh['indices'])
         g.smooth_normals(part)
         for quad in part['quads']:
@@ -44,15 +44,35 @@ def generate():
                 amount=amount*amount*(3-2*amount)
                 # Keep the back against the hips while the front clears bent knees.
                 if skirt:amount*=.5-.5*max(-1,min(1,z/2.15))
+                second=skirt_bone if skirt else -1
+                if elbow is not None:
+                    amount=min(1,max(0,(abs(x)-3.0)/.85))
+                    amount=amount*amount*(3-2*amount)
+                    second=elbow
+                if skin:u,v=.904541015625,.001708984375
                 vertex=[x*scale,24+y*scale,z*scale,nx,ny,nz,u,v,
-                    bone,skirt_bone if skirt else -1,-1,-1,1-amount,amount,0,0]
+                    bone,second,-1,-1,1-amount,amount,0,0]
                 key=tuple(vertex)
                 if key not in garment_vertices:
                     garment_vertices[key]=len(mesh['vertices']);mesh['vertices'].append(vertex)
                 corners.append(garment_vertices[key])
             mesh['indices'].extend(corners[i] for i in (0,1,2,0,2,3))
         mesh['materials'].append(dict(name=part['name'],start=start,count=len(mesh['indices'])-start,
-            color=[1,1,1,1],texture='bigfatfish:textures/entity/character_atlas.png',double_sided=True))
+            color=[1,1,1,1],texture='bigfatfish:textures/entity/mmd/10.png' if skin else 'bigfatfish:textures/entity/character_atlas.png',double_sided=True))
+
+    # The source omits skin hidden by the maid sleeves/bodice. Retaining its
+    # visible skin material alone leaves detached hands and an empty torso.
+    # Extend beneath the original shoulder/forearm boundaries, retaining hands.
+    torso=g.node('summer_body_completion')
+    g.torso(torso,[(-11.6,.43,.65),(-10.8,1.48,.94),(-10,1.7,1.25),
+                   (-8.65,1.15,1.27),(-7.5,1.4,1.12)],g.SKIN)
+    add(torso,12,skin=True)
+    for side,upper,elbow in ((1,19,24),(-1,49,54)):
+        arm=g.node('summer_arm_completion_'+str(side))
+        g.tube(arm,[(side*1.30,-10.75,.35),(side*2.2,-10.14,.35),
+                    (side*3.43194,-9.27113,.35424),(side*4.55,-8.49,.35)],
+               [.50,.46,.38,.29],g.SKIN,sections=32,sides=24,cap_end=True)
+        add(arm,upper,skin=True,elbow=elbow)
 
     top=g.node('summer_sleeveless_blouse')
     g.torso(top,[(-11.52,.5,.75),(-10.9,1.75,1.03),(-10.0,1.95,1.42),(-8.8,1.25,1.35)],g.PLAIN_WHITE)
